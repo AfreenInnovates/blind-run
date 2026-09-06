@@ -2,7 +2,12 @@
 
 import { useEffect } from "react";
 import { AuthProvider as OidcAuthProvider, useAuth } from "react-oidc-context";
-import { PROFILE_NAME_KEY, SPACETIME_AUTH_TOKEN_KEY, profileNameFromClaims } from "../lib/auth";
+import {
+  announceAuthTokenChange,
+  PROFILE_NAME_KEY,
+  SPACETIME_AUTH_TOKEN_KEY,
+  profileNameFromClaims,
+} from "../lib/auth";
 
 const AUTH_CLIENT_ID = process.env.NEXT_PUBLIC_SPACETIME_AUTH_CLIENT_ID;
 const AUTH_ENABLED = Boolean(AUTH_CLIENT_ID);
@@ -35,6 +40,7 @@ function AuthStorageBridge({ children }: { children: React.ReactNode }) {
       } catch {
         // Private browsing can still use the current auth session.
       }
+      announceAuthTokenChange();
       return;
     }
 
@@ -46,6 +52,8 @@ function AuthStorageBridge({ children }: { children: React.ReactNode }) {
     } catch {
       // The OIDC provider keeps the active session in memory.
     }
+    // wake anything gating on the token - it is usually mounted by now
+    announceAuthTokenChange();
   }, [auth.user]);
 
   return children;

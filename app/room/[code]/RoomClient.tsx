@@ -12,7 +12,11 @@ import {
 } from "react";
 import GameShell from "../../game/GameShell";
 import AuthControls from "../../components/AuthControls";
-import { PROFILE_NAME_KEY, SPACETIME_AUTH_TOKEN_KEY } from "../../lib/auth";
+import {
+  PROFILE_NAME_KEY,
+  readAuthToken,
+  subscribeAuthToken,
+} from "../../lib/auth";
 import { roomById } from "../../game/level";
 import {
   COUNTDOWN_MS,
@@ -67,13 +71,6 @@ export default function RoomClient({ code }: { code: string }) {
       return "";
     }
   }, []);
-  const readAuthToken = useCallback(() => {
-    try {
-      return localStorage.getItem(SPACETIME_AUTH_TOKEN_KEY) ?? "";
-    } catch {
-      return "";
-    }
-  }, []);
   const readSeat = useCallback(() => {
     try {
       const seat = sessionStorage.getItem(`heist:host:${code}`);
@@ -89,7 +86,12 @@ export default function RoomClient({ code }: { code: string }) {
   const readShare = useCallback(() => typeof navigator.share === "function", []);
 
   const storedName = useStored(readName, "");
-  const authToken = useStored(readAuthToken, "");
+  // must be a live subscription: the token lands after this page mounts
+  const authToken = useSyncExternalStore(
+    subscribeAuthToken,
+    readAuthToken,
+    () => "",
+  );
   const hostSize = useStored(readSeat, null);
   const link = useStored(readLink, "");
   const canShare = useStored(readShare, false);
