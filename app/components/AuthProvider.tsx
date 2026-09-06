@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { AuthProvider as OidcAuthProvider, useAuth } from "react-oidc-context";
+import { WebStorageStateStore } from "oidc-client-ts";
 import {
   announceAuthTokenChange,
   PROFILE_NAME_KEY,
@@ -29,10 +30,28 @@ function siteUrl() {
   return (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
 }
 
+/**
+ * Where the OIDC session lives.
+ *
+ * The library defaults to sessionStorage, which is per-tab: opening a shared
+ * room link in a new tab found no session and demanded a fresh sign-in. Keep it
+ * in localStorage so one sign-in covers every tab on the device and survives a
+ * reload, until the user actually signs out.
+ */
+function userStore() {
+  if (typeof window === "undefined") return undefined;
+  return new WebStorageStateStore({ store: window.localStorage });
+}
+
 function AuthStorageBridge({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
 
   useEffect(() => {
+    // While the library is still restoring a session, `user` is null but the
+    // person is not signed out. Clearing the token here is what made a new tab
+    // wipe the credential it was about to recover.
+    if (auth.isLoading) return;
+
     const user = auth.user;
     if (!user) {
       try {
@@ -54,7 +73,7 @@ function AuthStorageBridge({ children }: { children: React.ReactNode }) {
     }
     // wake anything gating on the token - it is usually mounted by now
     announceAuthTokenChange();
-  }, [auth.user]);
+  }, [auth.user, auth.isLoading]);
 
   return children;
 }
@@ -70,6 +89,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       post_logout_redirect_uri={`${siteUrl()}/`}
       scope="openid profile email"
       response_type="code"
+      userStore={userStore()}
+      stateStore={userStore()}
       automaticSilentRenew
       onSigninCallback={() => window.history.replaceState({}, document.title, "/")}
     >
