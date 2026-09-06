@@ -190,6 +190,13 @@ function profileFromAuth(ctx: HeistContext) {
   if (!claims) return null;
 
   const email = claim(claims, 'email');
+  // Every connection carries a JWT - SpacetimeDB issues one for anonymous
+  // clients too - so the presence of a token proves nothing. A signed-in user
+  // is one the issuer told us an email address for. Without that we were
+  // writing a "Player" row for every browser that opened the site, which both
+  // filled the signups table with visitors and let requireProfile wave anyone
+  // through into creating and joining rooms.
+  if (!email) return null;
   const name = (claim(claims, 'name') || claim(claims, 'preferred_username') || email.split('@')[0] || 'Player')
     .replace(/\s+/g, ' ')
     .slice(0, 16);
@@ -200,7 +207,7 @@ function profileFromAuth(ctx: HeistContext) {
 
 function requireProfile(ctx: HeistContext) {
   const profile = ctx.db.user_profile.identity.find(ctx.sender.toHexString());
-  if (!profile) throw new SenderError('Google sign-in required');
+  if (!profile) throw new SenderError('Sign in to create or join a room');
   return profile;
 }
 
