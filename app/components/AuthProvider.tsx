@@ -6,7 +6,21 @@ import { PROFILE_NAME_KEY, SPACETIME_AUTH_TOKEN_KEY, profileNameFromClaims } fro
 
 const AUTH_CLIENT_ID = process.env.NEXT_PUBLIC_SPACETIME_AUTH_CLIENT_ID;
 const AUTH_ENABLED = Boolean(AUTH_CLIENT_ID);
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://moonshot-dun-phi.vercel.app";
+
+/**
+ * Where the OIDC provider sends the browser back to.
+ *
+ * Read off the live origin rather than baked in at build time, so localhost,
+ * a Vercel preview and the production domain all work from one build - and
+ * renaming the domain does not silently bounce every sign-in to a dead host.
+ * The env var stays as an override for the rare case that is wrong.
+ */
+function siteUrl() {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL;
+  if (configured) return configured.replace(/\/$/, "");
+  if (typeof window !== "undefined") return window.location.origin;
+  return "";
+}
 
 function AuthStorageBridge({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
@@ -42,8 +56,8 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     <OidcAuthProvider
       authority="https://auth.spacetimedb.com/oidc"
       client_id={AUTH_CLIENT_ID}
-      redirect_uri={`${SITE_URL}/`}
-      post_logout_redirect_uri={`${SITE_URL}/`}
+      redirect_uri={`${siteUrl()}/`}
+      post_logout_redirect_uri={`${siteUrl()}/`}
       scope="openid profile email"
       response_type="code"
       automaticSilentRenew
