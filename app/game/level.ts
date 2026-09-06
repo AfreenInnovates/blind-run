@@ -165,16 +165,13 @@ export const commandChannel = (thiefRoom: RoomId): RoomId | null =>
 /**
  * Can this spectator talk to the thief right now?
  *
- * A crew of one is always on air - there is nobody to talk over, and they are
- * following the thief anyway. With a real crew, only the room the thief is
- * standing in has the channel.
+ * Only the spectator whose room the thief is standing in. Everyone else is off
+ * air, so two people can never call directions over each other.
  */
 export function channelOpen(
   thiefRoom: RoomId,
   watching: RoomId | null,
-  soleSpectator: boolean,
 ): boolean {
-  if (soleSpectator) return true;
   return watching !== null && commandChannel(thiefRoom) === watching;
 }
 

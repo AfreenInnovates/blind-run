@@ -129,20 +129,12 @@ export default function RoomClient({ code }: { code: string }) {
     if (room?.phase !== "playing" || !me?.role) return;
     const game = useGame.getState();
     game.reset();
-    const spectators =
-      room.players.filter((p) => p.role === "spectator").length;
     game.setMode(
       me.role === "thief"
         ? { kind: "thief" }
-        : {
-            kind: "spectator",
-            watching: me.watching ?? "lobby",
-            // one spectator cannot cover three rooms, and the vault code only
-            // exists in one of them - let them follow the thief instead
-            roam: spectators <= 1,
-          },
+        : { kind: "spectator", watching: me.watching ?? "lobby" },
     );
-  }, [room?.phase, me?.role, me?.watching, room?.players]);
+  }, [room?.phase, me?.role, me?.watching]);
 
   const join = async () => {
     if (joining) return;
@@ -317,9 +309,6 @@ export default function RoomClient({ code }: { code: string }) {
 
   /* --------------------------------------------------------------- game */
 
-  const soleSpectator =
-    (room?.players.filter((p) => p.role === "spectator").length ?? 0) <= 1;
-
   if (room?.phase === "playing" && me?.role) {
     return (
       <main className="relative flex-1">
@@ -327,9 +316,7 @@ export default function RoomClient({ code }: { code: string }) {
           title={
             me.role === "thief"
               ? `Thief · room ${code}`
-              : soleSpectator
-                ? `Spotter · room ${code}`
-                : `${roomById(me.watching ?? "lobby").name} · room ${code}`
+              : `${roomById(me.watching ?? "lobby").name} · room ${code}`
           }
         />
       </main>

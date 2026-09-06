@@ -280,10 +280,8 @@ function RemoteThief() {
   const mode = useGame((s) => s.mode);
   const thiefRoom = useGame((s) => s.room);
   const hp = useGame((s) => s.hp);
-  // a roaming spectator follows the thief, so the thief is always in shot
-  const roam = mode.kind === "spectator" && !!mode.roam;
   const watching = mode.kind === "spectator" ? mode.watching : null;
-  const inMyRoom = roam || (watching !== null && thiefRoom === watching);
+  const inMyRoom = watching !== null && thiefRoom === watching;
 
   const [invisible, setInvisible] = useState(false);
   useFrame((_, rawDt) => {

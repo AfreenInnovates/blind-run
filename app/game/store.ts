@@ -16,21 +16,7 @@ export type ViewMode = "thief" | "spectator" | "discovery";
 export type GameMode =
   | { kind: "solo" }
   | { kind: "thief" }
-  | {
-      kind: "spectator";
-      watching: RoomId;
-      /**
-       * The only spectator in the run follows the thief from room to room
-       * instead of being posted to one.
-       *
-       * A crew of one cannot cover the building, and the run has a hard
-       * dependency on the security room: the vault code is written on a note
-       * only a spectator can read. Pinning a lone spectator to the lobby left
-       * that note unreachable and the vault permanently shut, so a two-player
-       * game could never actually be finished.
-       */
-      roam?: boolean;
-    };
+  | { kind: "spectator"; watching: RoomId };
 
 export const VIEWS: {
   id: ViewMode;
@@ -387,15 +373,14 @@ export const useGame = create<GameState>()((set, get) => ({
 export function useRoomVisible(room: RoomId): boolean {
   const mode = useGame((s) => s.mode);
   const explored = useGame((s) => !!s.explored[room]);
-  // a posted spectator sees one room; a roaming one sees wherever the thief
-  // has been, the same rule solo play uses
-  if (mode.kind === "spectator" && !mode.roam) return mode.watching === room;
+  // a spectator sees exactly the one room they were posted to
+  if (mode.kind === "spectator") return mode.watching === room;
   return explored;
 }
 
-/** The room a spectator is currently looking at, posted or roaming. */
-export const watchedRoom = (mode: GameMode, thiefRoom: RoomId): RoomId | null =>
-  mode.kind !== "spectator" ? null : mode.roam ? thiefRoom : mode.watching;
+/** The one room this spectator was posted to. */
+export const watchedRoom = (mode: GameMode): RoomId | null =>
+  mode.kind === "spectator" ? mode.watching : null;
 
 /** This client owns the simulation (thief input, guards, detection). */
 export const useIsHost = () =>

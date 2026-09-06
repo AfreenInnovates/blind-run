@@ -31,9 +31,7 @@ const SHORT: Partial<Record<RoomId, string>> = {
 export default function Minimap() {
   const mode = useGame((s) => s.mode);
   const thiefRoom = useGame((s) => s.room);
-  // a roaming spectator sees the guards in whichever room the thief is in
-  const watching =
-    mode.kind === "spectator" ? (mode.roam ? thiefRoom : mode.watching) : null;
+  const watching = mode.kind === "spectator" ? mode.watching : null;
   // the thief must not get guard positions for free
   const showGuards = mode.kind !== "thief";
   const thief = useRef<SVGCircleElement>(null);

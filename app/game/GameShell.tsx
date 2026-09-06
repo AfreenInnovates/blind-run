@@ -36,12 +36,9 @@ const HIDDEN = [...CAMERAS, ...MARKERS].filter((m) => m.reveal === "discovery");
  */
 function onLiveChannel(by: string) {
   const session = useSession.getState();
-  const room = resolveRoom(session.room);
-  const sender = room?.players.find((p) => p.id === by);
+  const sender = resolveRoom(session.room)?.players.find((p) => p.id === by);
   if (!sender || sender.role !== "spectator") return false;
-  const sole =
-    (room?.players.filter((p) => p.role === "spectator").length ?? 0) <= 1;
-  return channelOpen(useGame.getState().room, sender.watching, sole);
+  return channelOpen(useGame.getState().room, sender.watching);
 }
 const noSubscribe = () => () => {};
 const readOnboardingCompletion = () => {
@@ -86,17 +83,15 @@ function DiscoveryPanel() {
   const mode = useGame((s) => s.mode);
   const explored = useGame((s) => s.explored);
   const currentRoom = useGame((s) => s.room);
-  // a roaming spectator works the whole building, a posted one just their room
-  const roam = mode.kind === "spectator" && !!mode.roam;
   const mine =
-    mode.kind === "spectator" && !roam
+    mode.kind === "spectator"
       ? HIDDEN.filter((m) => m.room === mode.watching)
       : HIDDEN;
-  const room = watchedRoom(mode, currentRoom) ?? currentRoom;
+  const room = watchedRoom(mode) ?? currentRoom;
   const roomDef = roomById(room);
   const found = mine.filter((m) => discovered[m.id]).length;
   const canSee = (room: string) =>
-    mode.kind === "spectator" && !roam
+    mode.kind === "spectator"
       ? mode.watching === room
       : !!explored[room as keyof typeof explored];
 
@@ -232,14 +227,13 @@ function CommandDeck() {
   const spendIntel = useGame((s) => s.spendIntel);
   const mode = useGame((s) => s.mode);
   const thiefRoom = useGame((s) => s.room);
-  const roam = mode.kind === "spectator" && !!mode.roam;
-  const watching = watchedRoom(mode, thiefRoom);
+  const watching = watchedRoom(mode);
   const [sent, setSent] = useState<CommandCode | null>(null);
   const lastSent = useRef<{ code: CommandCode; at: number } | null>(null);
 
   // one spectator talks at a time: the one whose room the thief is standing in
   const holder = commandChannel(thiefRoom);
-  const live = channelOpen(thiefRoom, watching, roam);
+  const live = channelOpen(thiefRoom, watching);
   const offAir = holder
     ? `Thief is in the ${roomById(holder).name} - ${roomById(holder).name} is calling it.`
     : `Thief is in the ${roomById(thiefRoom).name}. Nobody has the channel until they reach a watched room.`;
@@ -292,9 +286,7 @@ function CommandDeck() {
       </div>
       <div className="mt-1 text-[8px] uppercase tracking-widest text-zinc-600">
         {live
-          ? roam
-            ? "You are the whole crew - you follow the thief everywhere."
-            : "Short callouts only. The thief is moving."
+          ? "Short callouts only. The thief is moving."
           : `${offAir} You are back on the moment they walk into your room.`}
       </div>
       <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-2">
@@ -606,9 +598,7 @@ export default function GameShell({ title }: { title?: string }) {
             </h1>
             <p className="hidden text-[11px] text-zinc-500 sm:block">
               {spectator
-                ? mode.roam
-                  ? "You are the whole crew - you follow the thief room to room. You see what they cannot; tell them."
-                  : `You are posted to the ${roomById(mode.watching).name}. You see what the thief cannot - tell them.`
+                ? `You are posted to the ${roomById(mode.watching).name}. You see what the thief cannot - tell them.`
                 : mode.kind === "thief"
                   ? "You are the thief. You cannot see cameras, traps or guards' cones - your spectators can."
                   : "Solo sandbox: you drive the thief and can look through all three layers."}

@@ -145,11 +145,9 @@ const FOV = 45;
 function SpectatorRig({ active }: { active: boolean }) {
   const mode = useGame((s) => s.mode);
   const thiefRoom = useGame((s) => s.room);
-  // a posted spectator stays on their own room; a roaming one and solo play
-  // both follow the thief around
-  const room =
-    mode.kind === "spectator" && !mode.roam ? mode.watching : thiefRoom;
-  // either way a spectator's framing is bolted down - only solo may turn it
+  // a spectator stays on their own room; solo follows the thief around
+  const room = mode.kind === "spectator" ? mode.watching : thiefRoom;
+  // a spectator's framing is bolted down - only solo may turn it
   const posted = mode.kind === "spectator";
   // re-fit when the window changes shape, so a resize never crops the room
   const aspect = useThree((s) => s.viewport.aspect);
