@@ -16,10 +16,12 @@ const AUTH_ENABLED = Boolean(AUTH_CLIENT_ID);
  * The env var stays as an override for the rare case that is wrong.
  */
 function siteUrl() {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL;
-  if (configured) return configured.replace(/\/$/, "");
+  // The browser's own origin wins. It is the one value that is always correct,
+  // and it cannot go stale: a NEXT_PUBLIC_SITE_URL left pointing at localhost
+  // was being baked into the production build, so the deployed site sent every
+  // sign-in back to a machine the visitor does not have.
   if (typeof window !== "undefined") return window.location.origin;
-  return "";
+  return (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
 }
 
 function AuthStorageBridge({ children }: { children: React.ReactNode }) {
