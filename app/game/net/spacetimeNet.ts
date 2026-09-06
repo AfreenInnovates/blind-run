@@ -42,6 +42,11 @@ const phase = (value: string): Phase =>
 const joinFailure = (error: unknown): JoinFailure => {
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();
+  // the module refuses anyone it has no profile for. That is not a missing
+  // room, and calling it one sent people hunting for a room code that was
+  // fine - it means the connection carried no signed-in identity, usually a
+  // token that expired while the tab was open.
+  if (lower.includes("sign in") || lower.includes("profile")) return "auth";
   if (lower.includes("full")) return "full";
   if (lower.includes("started") || lower.includes("over") || lower.includes("countdown"))
     return "unavailable";
@@ -123,6 +128,8 @@ export class SpacetimeNet implements NetClient {
   private roomWaiters = new Set<RoomWaiter>();
   private drawTimer: ReturnType<typeof setTimeout> | null = null;
   private commandsReady = false;
+  /** last refusal from the module, so a create failure can be reported honestly */
+  lastError = "";
 
   async connect(code: string): Promise<void> {
     this.code = code;
@@ -270,7 +277,10 @@ export class SpacetimeNet implements NetClient {
         this.roomWaiters.delete(waiter);
         reject(error);
       };
-      waiter.timeout = setTimeout(() => waiter.reject(new Error("Timed out waiting for room state")), 5000);
+      waiter.timeout = setTimeout(
+        () => waiter.reject(new Error("Timed out waiting for room state")),
+        8000,
+      );
       this.roomWaiters.add(waiter);
     });
   }
@@ -406,13 +416,18 @@ export class SpacetimeNet implements NetClient {
         seed: room.seed,
       });
       return room;
-    } catch {
+    } catch (error) {
       // The module refuses a code it already holds. That is the normal case
       // when the host reloads their own room - the room they wanted exists, so
       // hand it back and let the join below reclaim their seat, rather than
       // telling them their own room does not exist.
       const existing = conn.db.gameRoom.code.find(room.code);
       if (existing) return this.room ?? room;
+      // Anything else is a real refusal and the caller can only report "no such
+      // room", which hides why. Say it once, plainly, so a failed create is
+      // diagnosable from the console instead of guessed at.
+      console.error("[heist] create_room refused:", error);
+      this.lastError = error instanceof Error ? error.message : String(error);
       return null;
     }
   }
@@ -423,16 +438,20 @@ export class SpacetimeNet implements NetClient {
     player.id = this.myId;
     try {
       await this.conn.reducers.joinRoom({ code });
-      // the seat carries the profile name, so wait for the seat rather than for
-      // a name this client picked
+      // The join is done the moment our seat exists. It also used to wait for
+      // the room to leave "lobby" once a second player was in, but the seat and
+      // the phase arrive as two separate row updates - so the waiter sat there
+      // until the countdown landed, taking about ten seconds when it worked and
+      // timing out into a bogus "no such room" when it did not.
       const room = await this.waitForRoom(
         (current) =>
           current.code === code &&
-          current.players.some((candidate) => candidate.id === this.myId) &&
-          (current.players.length < 2 || current.phase !== "lobby"),
+          current.players.some((candidate) => candidate.id === this.myId),
       );
       return { room: this.room ?? room };
     } catch (error) {
+      console.error("[heist] join_room refused:", error);
+      this.lastError = error instanceof Error ? error.message : String(error);
       return { error: joinFailure(error) };
     }
   }

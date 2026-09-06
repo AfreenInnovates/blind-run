@@ -26,7 +26,8 @@ export type SessionStatus =
   | "connected"
   | "notfound"
   | "full"
-  | "unavailable";
+  | "unavailable"
+  | "auth";
 
 interface SessionState {
   net: NetClient | null;
@@ -146,10 +147,22 @@ export const useSession = create<SessionState>()((set, get) => ({
       if (seedRoom) {
         const created = await net.createRoom({ ...seedRoom, hostId: "" });
         if (!created) {
+          const refusal = (
+            (net as { lastError?: string }).lastError ?? ""
+          ).toLowerCase();
           net.disconnect();
           unsubscribe?.();
           unsubscribe = null;
-          set({ status: "notfound", net: null });
+          // the module refuses anyone it holds no profile for; that is a stale
+          // sign-in, not a missing room, and saying "no such room" sent people
+          // hunting for a code that was never wrong
+          set({
+            status:
+              refusal.includes("sign in") || refusal.includes("profile")
+                ? "auth"
+                : "notfound",
+            net: null,
+          });
           return;
         }
       }
@@ -172,7 +185,9 @@ export const useSession = create<SessionState>()((set, get) => ({
             ? "full"
             : result.error === "unavailable"
               ? "unavailable"
-              : "notfound",
+              : result.error === "auth"
+                ? "auth"
+                : "notfound",
         net: null,
       });
       return;

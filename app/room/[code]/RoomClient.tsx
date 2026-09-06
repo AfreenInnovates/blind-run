@@ -279,6 +279,29 @@ export default function RoomClient({ code }: { code: string }) {
     );
   }
 
+  // A rejected profile is not a missing room. Say so, and offer the one thing
+  // that fixes it, rather than sending them to look for a room code.
+  if (status === "auth") {
+    return (
+      <Frame code={code} onBack={backAction}>
+        <div className="mb-4 inline-block border-2 border-[#111216] bg-[#ffd23b] px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] shadow-[3px_3px_0_#111216]">Session expired</div>
+        <h1 className="text-4xl font-black uppercase leading-none tracking-[-0.06em] sm:text-5xl">
+          Sign in again to join
+        </h1>
+        <p className="mt-4 max-w-lg border-l-4 border-[#ffd23b] pl-4 text-sm font-medium leading-relaxed text-[#5a5960]">
+          Room {code} is fine - your sign-in is what expired. Sign in again and
+          you will drop straight back into it.
+        </p>
+        <div className="mt-8 flex items-center gap-4">
+          <AuthControls />
+          <button onClick={() => window.location.reload()} className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6c6b70] hover:text-[#111216]">
+            Retry
+          </button>
+        </div>
+      </Frame>
+    );
+  }
+
   if (status === "notfound" || status === "full" || status === "unavailable") {
     return (
       <Frame code={code} onBack={backAction}>
