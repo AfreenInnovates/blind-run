@@ -54,7 +54,7 @@ function AuthStorageBridge({ children }: { children: React.ReactNode }) {
     if (auth.isLoading) return;
 
     const user = auth.user;
-    if (!user) {
+    if (!user || !auth.isAuthenticated || user.expired) {
       try {
         localStorage.removeItem(SPACETIME_AUTH_TOKEN_KEY);
       } catch {
@@ -74,7 +74,20 @@ function AuthStorageBridge({ children }: { children: React.ReactNode }) {
     }
     // wake anything gating on the token - it is usually mounted by now
     announceAuthTokenChange();
-  }, [auth.user, auth.isLoading]);
+  }, [auth.user, auth.isAuthenticated, auth.isLoading]);
+
+  useEffect(() => {
+    const clearExpiredToken = () => {
+      try {
+        localStorage.removeItem(SPACETIME_AUTH_TOKEN_KEY);
+      } catch {
+        // Private browsing can still use the current auth session.
+      }
+      announceAuthTokenChange();
+    };
+
+    return auth.events.addAccessTokenExpired(clearExpiredToken);
+  }, [auth.events]);
 
   return children;
 }

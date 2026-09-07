@@ -160,7 +160,12 @@ export const useSession = create<SessionState>()((set, get) => ({
           // hunting for a code that was never wrong
           set({
             status:
-              refusal.includes("sign in") || refusal.includes("profile")
+              refusal.includes("sign in") ||
+              refusal.includes("profile") ||
+              refusal.includes("unauthorized") ||
+              refusal.includes("invalid token") ||
+              refusal.includes("jwt") ||
+              refusal.includes("401")
                 ? "auth"
                 : refusal.includes("timed out") || refusal.includes("timeout")
                   ? "timeout"
@@ -176,9 +181,17 @@ export const useSession = create<SessionState>()((set, get) => ({
       unsubscribe = null;
       const message = error instanceof Error ? error.message.toLowerCase() : "";
       set({
-        status: message.includes("timed out") || message.includes("timeout")
-          ? "timeout"
-          : "connection",
+        status:
+          message.includes("sign in") ||
+          message.includes("profile") ||
+          message.includes("unauthorized") ||
+          message.includes("invalid token") ||
+          message.includes("jwt") ||
+          message.includes("401")
+            ? "auth"
+            : message.includes("timed out") || message.includes("timeout")
+              ? "timeout"
+              : "connection",
         net: null,
       });
       return;

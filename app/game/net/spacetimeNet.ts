@@ -39,6 +39,19 @@ const roomId = (value: string): RoomId | null =>
 const phase = (value: string): Phase =>
   PHASES.includes(value as Phase) ? (value as Phase) : "lobby";
 
+function tokenIsExpired(token: string) {
+  try {
+    const encoded = token.split(".")[1];
+    if (!encoded) return false;
+    const payload = JSON.parse(
+      atob(encoded.replace(/-/g, "+").replace(/_/g, "/")),
+    ) as { exp?: unknown };
+    return typeof payload.exp === "number" && payload.exp <= Date.now() / 1000;
+  } catch {
+    return false;
+  }
+}
+
 const joinFailure = (error: unknown): JoinFailure => {
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();
@@ -46,7 +59,15 @@ const joinFailure = (error: unknown): JoinFailure => {
   // room, and calling it one sent people hunting for a room code that was
   // fine - it means the connection carried no signed-in identity, usually a
   // token that expired while the tab was open.
-  if (lower.includes("sign in") || lower.includes("profile")) return "auth";
+  if (
+    lower.includes("sign in") ||
+    lower.includes("profile") ||
+    lower.includes("unauthorized") ||
+    lower.includes("invalid token") ||
+    lower.includes("jwt") ||
+    lower.includes("401")
+  )
+    return "auth";
   if (lower.includes("full")) return "full";
   if (lower.includes("started") || lower.includes("over") || lower.includes("countdown"))
     return "unavailable";
@@ -147,6 +168,11 @@ export class SpacetimeNet implements NetClient {
       token = localStorage.getItem(SPACETIME_AUTH_TOKEN_KEY) ?? "";
       authenticated = Boolean(token);
       if (!authenticated) token = localStorage.getItem(tokenKey) ?? "";
+      if (token && tokenIsExpired(token)) {
+        if (authenticated) localStorage.removeItem(SPACETIME_AUTH_TOKEN_KEY);
+        token = "";
+        authenticated = false;
+      }
     } catch {
       /* anonymous identity can still connect without persistence */
     }
