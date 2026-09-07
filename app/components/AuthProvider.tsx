@@ -5,6 +5,7 @@ import { AuthProvider as OidcAuthProvider, useAuth } from "react-oidc-context";
 import { WebStorageStateStore } from "oidc-client-ts";
 import {
   announceAuthTokenChange,
+  consumeAuthReturnTo,
   PROFILE_NAME_KEY,
   SPACETIME_AUTH_TOKEN_KEY,
   profileNameFromClaims,
@@ -92,7 +93,14 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
       userStore={userStore()}
       stateStore={userStore()}
       automaticSilentRenew
-      onSigninCallback={() => window.history.replaceState({}, document.title, "/")}
+      onSigninCallback={() => {
+        const returnTo = consumeAuthReturnTo();
+        if (returnTo && returnTo !== window.location.pathname) {
+          window.location.replace(returnTo);
+          return;
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }}
     >
       <AuthStorageBridge>{children}</AuthStorageBridge>
     </OidcAuthProvider>

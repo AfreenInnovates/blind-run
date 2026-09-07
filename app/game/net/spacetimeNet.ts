@@ -50,7 +50,9 @@ const joinFailure = (error: unknown): JoinFailure => {
   if (lower.includes("full")) return "full";
   if (lower.includes("started") || lower.includes("over") || lower.includes("countdown"))
     return "unavailable";
-  return "notfound";
+  if (lower.includes("no such room") || lower.includes("room not found")) return "notfound";
+  if (lower.includes("timed out") || lower.includes("timeout")) return "timeout";
+  return "connection";
 };
 
 const startFailure = (error: unknown): StartResult => {

@@ -302,19 +302,34 @@ export default function RoomClient({ code }: { code: string }) {
     );
   }
 
-  if (status === "notfound" || status === "full" || status === "unavailable") {
+  if (
+    status === "notfound" ||
+    status === "full" ||
+    status === "unavailable" ||
+    status === "timeout" ||
+    status === "connection"
+  ) {
+    const signalUnavailable = status === "timeout" || status === "connection";
     return (
       <Frame code={code} onBack={backAction}>
-        <div className="mb-4 inline-block border-2 border-[#111216] bg-[#ff5b55] px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] shadow-[3px_3px_0_#111216]">Signal error</div>
+        <div className="mb-4 inline-block border-2 border-[#111216] bg-[#ff5b55] px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] shadow-[3px_3px_0_#111216]">
+          {signalUnavailable ? "Signal unavailable" : "Signal error"}
+        </div>
         <h1 className="text-4xl font-black uppercase leading-none tracking-[-0.06em] sm:text-5xl">
-          {status === "full"
+          {signalUnavailable
+            ? "Could not reach that room"
+            : status === "full"
             ? "That room is full"
             : status === "unavailable"
               ? "That room is unavailable"
               : "No such room"}
         </h1>
         <p className="mt-4 max-w-lg border-l-4 border-[#ff5b55] pl-4 text-sm font-medium leading-relaxed text-[#5a5960]">
-          {status === "full"
+          {status === "timeout"
+            ? "The room may still be active. The connection took too long to respond; try again from the same invite."
+            : status === "connection"
+              ? "The room service could not be reached. Check your connection and try the invite again."
+              : status === "full"
             ? "Every seat is taken. Ask the host to start a new one."
             : status === "unavailable"
               ? "This room is no longer accepting new players. Rejoin from the same tab to restore an existing seat."

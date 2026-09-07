@@ -1,5 +1,6 @@
 export const SPACETIME_AUTH_TOKEN_KEY = "heist:spacetime-auth-token";
 export const PROFILE_NAME_KEY = "heist:name";
+export const AUTH_RETURN_TO_KEY = "heist:auth-return-to";
 
 export function claimString(
   claims: Record<string, unknown> | undefined,
@@ -49,6 +50,27 @@ export function subscribeAuthToken(onChange: () => void) {
 export function readAuthToken() {
   try {
     return localStorage.getItem(SPACETIME_AUTH_TOKEN_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function rememberAuthReturnTo() {
+  if (typeof window === "undefined") return;
+  const returnTo = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (!returnTo.startsWith("/") || returnTo.startsWith("//")) return;
+  try {
+    sessionStorage.setItem(AUTH_RETURN_TO_KEY, returnTo);
+  } catch {
+    // The OIDC redirect still works; it just falls back to the home page.
+  }
+}
+
+export function consumeAuthReturnTo() {
+  try {
+    const returnTo = sessionStorage.getItem(AUTH_RETURN_TO_KEY) ?? "";
+    sessionStorage.removeItem(AUTH_RETURN_TO_KEY);
+    return returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "";
   } catch {
     return "";
   }

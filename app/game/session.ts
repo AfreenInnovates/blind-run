@@ -27,7 +27,9 @@ export type SessionStatus =
   | "notfound"
   | "full"
   | "unavailable"
-  | "auth";
+  | "auth"
+  | "timeout"
+  | "connection";
 
 interface SessionState {
   net: NetClient | null;
@@ -160,17 +162,25 @@ export const useSession = create<SessionState>()((set, get) => ({
             status:
               refusal.includes("sign in") || refusal.includes("profile")
                 ? "auth"
-                : "notfound",
+                : refusal.includes("timed out") || refusal.includes("timeout")
+                  ? "timeout"
+                  : "connection",
             net: null,
           });
           return;
         }
       }
-    } catch {
+    } catch (error) {
       net.disconnect();
       unsubscribe?.();
       unsubscribe = null;
-      set({ status: "notfound", net: null });
+      const message = error instanceof Error ? error.message.toLowerCase() : "";
+      set({
+        status: message.includes("timed out") || message.includes("timeout")
+          ? "timeout"
+          : "connection",
+        net: null,
+      });
       return;
     }
 
@@ -187,7 +197,11 @@ export const useSession = create<SessionState>()((set, get) => ({
               ? "unavailable"
               : result.error === "auth"
                 ? "auth"
-                : "notfound",
+                : result.error === "timeout"
+                  ? "timeout"
+                  : result.error === "connection"
+                    ? "connection"
+                    : "notfound",
         net: null,
       });
       return;

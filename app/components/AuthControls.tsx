@@ -1,7 +1,11 @@
 "use client";
 
 import { useAuth } from "react-oidc-context";
-import { claimString, profileNameFromClaims } from "../lib/auth";
+import {
+  claimString,
+  profileNameFromClaims,
+  rememberAuthReturnTo,
+} from "../lib/auth";
 
 const AUTH_ENABLED = Boolean(process.env.NEXT_PUBLIC_SPACETIME_AUTH_CLIENT_ID);
 
@@ -19,7 +23,10 @@ function ConfiguredAuthControls() {
   if (!auth.isAuthenticated) {
     return (
       <button
-        onClick={() => void auth.signinRedirect()}
+        onClick={() => {
+          rememberAuthReturnTo();
+          void auth.signinRedirect();
+        }}
         className="border-2 border-[#111216] bg-[#fffdf7] px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] shadow-[3px_3px_0_#111216] transition hover:bg-[#111216] hover:text-[#f2eee5]"
       >
         Continue with Google

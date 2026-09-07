@@ -94,7 +94,13 @@ export type NetMessage =
   | ({ type: "voice" } & VoiceTransmission)
   | { type: "bye"; id: string };
 
-export type JoinFailure = "notfound" | "full" | "unavailable" | "auth";
+export type JoinFailure =
+  | "notfound"
+  | "full"
+  | "unavailable"
+  | "auth"
+  | "timeout"
+  | "connection";
 export type StartFailure = "notfound" | "not-host" | "not-ready" | "started";
 export type StartResult =
   | { ok: true }
