@@ -154,23 +154,27 @@ export const useSession = create<SessionState>()((set, get) => ({
           net.disconnect();
           unsubscribe?.();
           unsubscribe = null;
-          // the module refuses anyone it holds no profile for; that is a stale
-          // sign-in, not a missing room, and saying "no such room" sent people
-          // hunting for a code that was never wrong
-          set({
-            status:
-              refusal.includes("sign in") ||
-              refusal.includes("profile") ||
-              refusal.includes("unauthorized") ||
-              refusal.includes("invalid token") ||
-              refusal.includes("jwt") ||
-              refusal.includes("401")
-                ? "auth"
-                : refusal.includes("timed out") || refusal.includes("timeout")
-                  ? "timeout"
-                  : "connection",
-            net: null,
-          });
+          // Surface the actual module refusal so users know what went wrong.
+          let errorStatus: SessionStatus = "notfound";
+          if (
+            refusal.includes("sign in") ||
+            refusal.includes("profile") ||
+            refusal.includes("unauthorized") ||
+            refusal.includes("invalid token") ||
+            refusal.includes("jwt") ||
+            refusal.includes("401")
+          ) {
+            errorStatus = "auth";
+          } else if (refusal.includes("taken")) {
+            errorStatus = "unavailable";
+          } else if (refusal.includes("timed out") || refusal.includes("timeout")) {
+            errorStatus = "timeout";
+          } else {
+            errorStatus = "connection";
+          }
+          
+          console.warn("[heist] room creation failed:", refusal || "unknown");
+          set({ status: errorStatus, net: null });
           return;
         }
       }

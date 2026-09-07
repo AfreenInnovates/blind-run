@@ -14,4 +14,5 @@ export default {
   code: __t.string(),
   maxPlayers: __t.u32(),
   seed: __t.u32(),
+  name: __t.string(),
 };

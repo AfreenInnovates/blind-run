@@ -151,6 +151,7 @@ export class SpacetimeNet implements NetClient {
   private code = "";
   private myId = "";
   private identity = "";
+  private playerName = "";
   private room: RoomState | null = null;
   private roomWaiters = new Set<RoomWaiter>();
   private drawTimer: ReturnType<typeof setTimeout> | null = null;
@@ -169,6 +170,10 @@ export class SpacetimeNet implements NetClient {
     let token = "";
     let authenticated = false;
     try {
+      // Prefer the OIDC auth token if the user is signed in (optional,
+      // enriches the experience). Otherwise use a cached anonymous token
+      // so the tab can reclaim its seat across refreshes. Guest access
+      // works without any stored token — SpacetimeDB issues one on connect.
       token = localStorage.getItem(SPACETIME_AUTH_TOKEN_KEY) ?? "";
       authenticated = Boolean(token);
       if (!authenticated) token = localStorage.getItem(tokenKey) ?? "";
@@ -440,12 +445,13 @@ export class SpacetimeNet implements NetClient {
     const conn = this.conn;
     if (!conn) return null;
     try {
-      // the module takes the display name from the signed-in profile, not from
-      // whatever the client claims
+      // Guest-friendly: pass the player name so the module can use it even
+      // without a Google profile. Auth profiles still take priority server-side.
       await conn.reducers.createRoom({
         code: room.code,
         maxPlayers: room.maxPlayers,
         seed: room.seed,
+        name: this.playerName,
       });
       return room;
     } catch (error) {
@@ -467,9 +473,10 @@ export class SpacetimeNet implements NetClient {
   async join(code: string, player: PlayerInfo): Promise<{ room: RoomState } | { error: JoinFailure }> {
     if (!this.conn) return { error: "notfound" };
     this.myId = `${code}:${this.identity}`;
+    this.playerName = player.name;
     player.id = this.myId;
     try {
-      await this.conn.reducers.joinRoom({ code });
+      await this.conn.reducers.joinRoom({ code, name: player.name });
       // The join is done the moment our seat exists. The seat and phase arrive
       // as separate row updates, so do not wait for the full-room countdown.
       const room = await this.waitForRoom(

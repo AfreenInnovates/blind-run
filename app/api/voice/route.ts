@@ -1,5 +1,4 @@
 import { COMMANDS, type CommandCode } from "../../game/commands";
-import { broadcast, getRoom } from "../../lib/roomStore";
 import {
   createVoiceAsset,
   getVoiceAsset,
@@ -118,43 +117,5 @@ export async function POST(request: Request) {
     }
   }
 
-  if (body.action !== "command" || !body.code || !body.playerId) {
-    return Response.json({ error: "invalid voice command" }, { status: 400 });
-  }
-
-  const code = body.code.toUpperCase();
-  const room = getRoom(code);
-  const player = room?.players.find((candidate) => candidate.id === body.playerId);
-  if (!room || room.phase !== "playing" || player?.role !== "spectator") {
-    return Response.json({ error: "only an active spectator can command" }, { status: 403 });
-  }
-
-  // Preserve the existing visual command immediately, even if TTS is unavailable.
-  broadcast(code, { type: "command", command: body.command, by: body.playerId, t: Date.now() });
-
-  // warm the clip before announcing it, so nobody is sent a URL that 404s
-  try {
-    await createVoiceAsset(`command:${body.command}`, COMMAND_TEXT[body.command]);
-  } catch (error) {
-    return providerErrorResponse(error, "room command synthesis failed");
-  }
-
-  const currentRoom = getRoom(code);
-  const currentPlayer = currentRoom?.players.find((candidate) => candidate.id === body.playerId);
-  if (!currentRoom || currentRoom.phase !== "playing" || currentPlayer?.role !== "spectator") {
-    return Response.json(
-      { ok: false, voice: false, error: { code: "room_invalid", message: "The room is no longer active" } },
-      { status: 409 },
-    );
-  }
-
-  broadcast(code, {
-    type: "voice",
-    id: `${code}:${crypto.randomUUID()}`,
-    command: body.command,
-    by: body.playerId,
-    audioUrl: commandAudioUrl(body.command),
-    t: Date.now(),
-  });
-  return Response.json({ ok: true, voice: true });
+  return Response.json({ error: "invalid action" }, { status: 400 });
 }

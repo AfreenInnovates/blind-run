@@ -12,4 +12,5 @@ import {
 
 export default {
   code: __t.string(),
+  name: __t.string(),
 };

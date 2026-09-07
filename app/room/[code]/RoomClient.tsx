@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import QRCode from "qrcode";
+
 import {
   useCallback,
   useEffect,
@@ -61,7 +61,7 @@ export default function RoomClient({ code }: { code: string }) {
   const [joining, setJoining] = useState(false);
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
-  const [qrCode, setQrCode] = useState("");
+
 
   const readName = useCallback(() => {
     try {
@@ -96,20 +96,7 @@ export default function RoomClient({ code }: { code: string }) {
   const canShare = useStored(readShare, false);
   const name = edited ?? storedName;
 
-  useEffect(() => {
-    if (!link) return;
-    let active = true;
-    void QRCode.toDataURL(link, {
-      width: 240,
-      margin: 2,
-      color: { dark: "#111216", light: "#fffdf7" },
-    }).then((dataUrl) => {
-      if (active) setQrCode(dataUrl);
-    });
-    return () => {
-      active = false;
-    };
-  }, [link]);
+
 
   // Keep the server-side seat on a refresh so the stable tab identity can
   // rejoin it. Explicit Leave controls remove the player row.
@@ -211,27 +198,7 @@ export default function RoomClient({ code }: { code: string }) {
 
   const backAction = status === "connected" ? leaveAndGo : undefined;
 
-  /* ---------------------------------------------------------------- gate */
 
-  if (AUTH_ENABLED && !authToken) {
-    return (
-      <Frame code={code} onBack={backAction}>
-        <div className="mb-4 inline-block border-2 border-[#111216] bg-[#e9ff4f] px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] shadow-[3px_3px_0_#111216]">Profile gate</div>
-        <h1 className="text-4xl font-black uppercase leading-none tracking-[-0.06em] sm:text-5xl">
-          Sign in to join
-        </h1>
-        <p className="mt-4 max-w-lg border-l-4 border-[#3b63ff] pl-4 text-sm font-medium leading-relaxed text-[#5a5960]">
-          Use your Google profile once. Your saved name will be used automatically in every room.
-        </p>
-        <div className="mt-8 flex items-center gap-4">
-          <AuthControls />
-          <Link href="/" className="text-[10px] font-black uppercase tracking-[0.16em] text-[#6c6b70] hover:text-[#111216]">
-            Back to base
-          </Link>
-        </div>
-      </Frame>
-    );
-  }
 
   if (status === "idle") {
     return (
@@ -456,28 +423,12 @@ export default function RoomClient({ code }: { code: string }) {
               )}
             </div>
           </div>
-          <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#77757a]">
-            Scan or share this link to join room {code}.
+        <div className="mt-3 flex items-center gap-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#77757a]">
+            Share this link to join room {code}.
           </p>
+          <AuthControls />
         </div>
-        <div className="flex w-full max-w-[13rem] flex-col items-center border-2 border-[#111216] bg-[#fffdf7] p-3 shadow-[4px_4px_0_#111216]">
-          {qrCode ? (
-            <Image
-              src={qrCode}
-              alt={`QR code to join room ${code}`}
-              width={192}
-              height={192}
-              unoptimized
-              className="h-auto w-full"
-            />
-          ) : (
-            <div className="grid aspect-square w-full place-items-center bg-[#e4ded2] text-center text-[10px] font-black uppercase tracking-widest text-[#5a5960]">
-              Preparing invite code...
-            </div>
-          )}
-          <span className="mt-2 text-[10px] font-black uppercase tracking-widest">
-            Scan to join
-          </span>
         </div>
       </div>
 

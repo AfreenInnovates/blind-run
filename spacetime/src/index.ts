@@ -204,10 +204,17 @@ function profileFromAuth(ctx: HeistContext) {
   return { name, email, picture };
 }
 
-function requireProfile(ctx: HeistContext) {
+/**
+ * Resolve a display name for this player. Uses the authenticated Google profile
+ * name when available (best experience for returning users), otherwise falls
+ * back to the name the client supplied. This means guests can play without
+ * signing in — the hackathon requirement is "name only, skip passwords."
+ */
+function resolvePlayerName(ctx: HeistContext, clientName: string): string {
   const profile = ctx.db.user_profile.identity.find(ctx.sender.toHexString());
-  if (!profile) throw new SenderError('Sign in to create or join a room');
-  return profile;
+  if (profile) return profile.name;
+  const trimmed = clientName.trim().replace(/\s+/g, ' ').slice(0, 16);
+  return trimmed || `Player-${ctx.sender.toHexString().slice(0, 6)}`;
 }
 
 function endRoom(ctx: HeistContext, code: string, result: string, text: string) {
@@ -310,10 +317,10 @@ export const on_connect = spacetimedb.clientConnected((ctx) => {
 });
 
 export const create_room = spacetimedb.reducer(
-  { code: t.string(), max_players: t.u32(), seed: t.u32() },
-  (ctx, { code, max_players, seed }) => {
+  { code: t.string(), max_players: t.u32(), seed: t.u32(), name: t.string() },
+  (ctx, { code, max_players, seed, name }) => {
     if (ctx.db.game_room.code.find(code)) throw new Error('room code taken');
-    const profile = requireProfile(ctx);
+    const playerName = resolvePlayerName(ctx, name);
     const at = nowMs(ctx.timestamp);
     const host = ctx.sender.toHexString();
 
@@ -332,7 +339,7 @@ export const create_room = spacetimedb.reducer(
       id: `${code}:${host}`,
       room_code: code,
       identity: host,
-      name: profile.name,
+      name: playerName,
       role: '',
       watching: '',
       joined_at: at,
@@ -344,11 +351,11 @@ export const create_room = spacetimedb.reducer(
 );
 
 export const join_room = spacetimedb.reducer(
-  { code: t.string() },
-  (ctx, { code }) => {
+  { code: t.string(), name: t.string() },
+  (ctx, { code, name }) => {
     const room = ctx.db.game_room.code.find(code);
     if (!room) throw new Error('no such room');
-    const profile = requireProfile(ctx);
+    const playerName = resolvePlayerName(ctx, name);
 
     const identity = ctx.sender.toHexString();
     const id = `${code}:${identity}`;
@@ -361,7 +368,7 @@ export const join_room = spacetimedb.reducer(
       // reconnecting - keep whatever role they already hold
       ctx.db.player.id.update({
         ...existing,
-        name: profile.name,
+        name: playerName,
         connected: true,
         rejoin_until: 0n,
         connection_id: ctx.connectionId?.toHexString() ?? existing.connection_id,
@@ -381,7 +388,7 @@ export const join_room = spacetimedb.reducer(
       id,
       room_code: code,
       identity,
-      name: profile.name,
+      name: playerName,
       role: '',
       watching: '',
       joined_at: at,
