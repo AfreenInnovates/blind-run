@@ -408,7 +408,7 @@ export default function RoomClient({ code }: { code: string }) {
       : room.phase === "playing"
         ? "Game starting - assigning roles..."
         : enoughPlayers
-          ? "All seats are filled. The ten-second countdown is starting."
+          ? "All seats are filled. The host can start the ten-second countdown."
           : `Waiting for ${room.maxPlayers - playerCount} more player${room.maxPlayers - playerCount === 1 ? "" : "s"}.`;
   const startErrorMessage =
     startError === "not-host"

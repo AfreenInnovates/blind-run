@@ -193,17 +193,14 @@ export function joinRoom(code: string, player: PlayerInfo): JoinResult {
     { ...player, connected: true, rejoinUntil: 0 },
   ];
   const hostId = room.hostId || player.id;
-  // The room only starts once every configured seat is filled.
-  const kickOff = room.phase === "lobby" && players.length >= room.maxPlayers;
-
   return {
     ok: true,
     room: publish({
       ...room,
       hostId,
       players,
-       phase: kickOff ? "countdown" : room.phase,
-      startsAt: kickOff ? Date.now() + COUNTDOWN_MS : room.startsAt,
+      phase: room.phase,
+      startsAt: room.startsAt,
     }),
   };
 }

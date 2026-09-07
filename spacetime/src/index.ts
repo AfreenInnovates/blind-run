@@ -390,15 +390,8 @@ export const join_room = spacetimedb.reducer(
       connection_id: ctx.connectionId?.toHexString() ?? '',
     });
 
-    // Start the ten second clock only after every configured seat is filled.
-    if (room.phase === 'lobby' && seats + 1 >= room.max_players) {
-      ctx.db.game_room.code.update({
-        ...room,
-        host: room.host || identity,
-        phase: 'countdown',
-        starts_at: at + 10_000n,
-      });
-    } else if (!room.host) {
+    // Keep the full lobby open until the host starts the ten-second countdown.
+    if (!room.host) {
       ctx.db.game_room.code.update({ ...room, host: identity });
     }
   }
