@@ -20,7 +20,6 @@
 import { ScheduleAt, SenderError, schema, table, t, type ReducerCtx } from 'spacetimedb/server';
 
 const WATCHABLE = ['lobby', 'sec', 'vault'] as const;
-const MIN_PLAYERS = 2;
 const SPECTATOR_REJOIN_MS = 20_000n;
 
 const spectatorGrace = table(
@@ -391,8 +390,8 @@ export const join_room = spacetimedb.reducer(
       connection_id: ctx.connectionId?.toHexString() ?? '',
     });
 
-    // second player through the door starts the ten second clock
-    if (room.phase === 'lobby' && seats + 1 >= 2) {
+    // Start the ten second clock only after every configured seat is filled.
+    if (room.phase === 'lobby' && seats + 1 >= room.max_players) {
       ctx.db.game_room.code.update({
         ...room,
         host: room.host || identity,
@@ -457,7 +456,7 @@ export const leave_room = spacetimedb.reducer(
       host = nextHost?.identity ?? '';
     }
 
-    const waitingAgain = room.phase === 'countdown' && remaining.length < MIN_PLAYERS;
+    const waitingAgain = room.phase === 'countdown' && remaining.length < room.max_players;
     ctx.db.game_room.code.update({
       ...room,
       host,
@@ -539,12 +538,12 @@ export const start_run = spacetimedb.reducer(
 
     let players = 0;
     for (const p of ctx.db.player.iter()) if (p.room_code === code) players++;
-    if (players < MIN_PLAYERS) throw new Error('at least two players are required');
+    if (players < room.max_players) throw new Error('all players must be present');
 
     ctx.db.game_room.code.update({
       ...room,
       phase: 'countdown',
-      starts_at: nowMs(ctx.timestamp) + 1_500n,
+      starts_at: nowMs(ctx.timestamp) + 10_000n,
     });
   }
 );

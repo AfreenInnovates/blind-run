@@ -56,7 +56,7 @@ export default function RoomsPage() {
             <div className="mb-4 inline-block border-2 border-[#111216] bg-[#e9ff4f] px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] shadow-[3px_3px_0_#111216]">Lobby terminal / 02</div>
             <h1 className="text-5xl font-black uppercase leading-[0.88] tracking-[-0.07em] sm:text-7xl">Set the<br /><span className="text-[#3b63ff]">crew loose.</span></h1>
           </div>
-          <p className="max-w-md border-l-4 border-[#3b63ff] pl-4 text-sm font-medium leading-relaxed text-[#4e4d53]">Create a room, share the code, then wait for a second player. The facility starts drawing roles as soon as the crew is in.</p>
+          <p className="max-w-md border-l-4 border-[#3b63ff] pl-4 text-sm font-medium leading-relaxed text-[#4e4d53]">Create a room, share the code, then wait for the full crew. The ten-second countdown starts only when every seat is filled.</p>
         </header>
 
         <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
@@ -106,7 +106,7 @@ export default function RoomsPage() {
         </div>
 
         <section className="grid gap-4 py-10 sm:grid-cols-3">
-          {[['01', 'Make the room', 'Pick the number of seats and open the facility.'], ['02', 'Share the signal', 'Copy the generated room link and send it to your crew.'], ['03', 'Watch the draw', 'Two players starts the clock. Roles are hidden until zero.']].map(([n, title, text]) => <div key={n} className="border-t-2 border-[#111216] pt-4"><span className="font-mono text-sm font-bold text-[#3b63ff]">{n}</span><h3 className="mt-2 text-sm font-black uppercase tracking-wide">{title}</h3><p className="mt-2 text-xs font-medium leading-relaxed text-[#66656a]">{text}</p></div>)}
+          {[['01', 'Make the room', 'Pick the number of seats and open the facility.'], ['02', 'Share the signal', 'Copy the generated room link and send it to your crew.'], ['03', 'Watch the draw', 'Every seat starts the ten-second clock. Roles are hidden until zero.']].map(([n, title, text]) => <div key={n} className="border-t-2 border-[#111216] pt-4"><span className="font-mono text-sm font-bold text-[#3b63ff]">{n}</span><h3 className="mt-2 text-sm font-black uppercase tracking-wide">{title}</h3><p className="mt-2 text-xs font-medium leading-relaxed text-[#66656a]">{text}</p></div>)}
         </section>
       </div>
     </main>

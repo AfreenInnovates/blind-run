@@ -80,7 +80,11 @@ const startFailure = (error: unknown): StartResult => {
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();
   if (lower.includes("only the host")) return { ok: false, error: "not-host" };
-  if (lower.includes("at least") || lower.includes("minimum"))
+  if (
+    lower.includes("at least") ||
+    lower.includes("minimum") ||
+    lower.includes("all players")
+  )
     return { ok: false, error: "not-ready" };
   if (lower.includes("started") || lower.includes("countdown") || lower.includes("phase"))
     return { ok: false, error: "started" };
@@ -466,11 +470,8 @@ export class SpacetimeNet implements NetClient {
     player.id = this.myId;
     try {
       await this.conn.reducers.joinRoom({ code });
-      // The join is done the moment our seat exists. It also used to wait for
-      // the room to leave "lobby" once a second player was in, but the seat and
-      // the phase arrive as two separate row updates - so the waiter sat there
-      // until the countdown landed, taking about ten seconds when it worked and
-      // timing out into a bogus "no such room" when it did not.
+      // The join is done the moment our seat exists. The seat and phase arrive
+      // as separate row updates, so do not wait for the full-room countdown.
       const room = await this.waitForRoom(
         (current) =>
           current.code === code &&

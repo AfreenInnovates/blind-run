@@ -8,7 +8,6 @@ import { useGame } from "./store";
 import type { CommandCode } from "./commands";
 import {
   MAX_PLAYERS,
-  MIN_PLAYERS,
   newId,
   type NetClient,
   type NetMessage,
@@ -236,7 +235,7 @@ export const useSession = create<SessionState>()((set, get) => ({
       !s.room ||
       !s.isHost ||
       (s.room.phase !== "lobby" && s.room.phase !== "countdown") ||
-      s.room.players.length < MIN_PLAYERS
+      s.room.players.length < s.room.maxPlayers
     )
       return false;
 

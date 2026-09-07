@@ -20,7 +20,6 @@ import {
 import { roomById } from "../../game/level";
 import {
   COUNTDOWN_MS,
-  MIN_PLAYERS,
   type RoomState,
 } from "../../game/net/types";
 import { resolveRoom, useSession } from "../../game/session";
@@ -284,13 +283,14 @@ export default function RoomClient({ code }: { code: string }) {
   if (status === "auth") {
     return (
       <Frame code={code} onBack={backAction}>
-        <div className="mb-4 inline-block border-2 border-[#111216] bg-[#ffd23b] px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] shadow-[3px_3px_0_#111216]">Session expired</div>
+        <div className="mb-4 inline-block border-2 border-[#111216] bg-[#ffd23b] px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em] shadow-[3px_3px_0_#111216]">Sign-in required</div>
         <h1 className="text-4xl font-black uppercase leading-none tracking-[-0.06em] sm:text-5xl">
-          Sign in again to join
+          Sign in before joining
         </h1>
         <p className="mt-4 max-w-lg border-l-4 border-[#ffd23b] pl-4 text-sm font-medium leading-relaxed text-[#5a5960]">
-          Room {code} is fine - your sign-in is what expired. Sign in again and
-          you will drop straight back into it.
+          You must sign in with Google before joining room {code}. If you were
+          already signed in, that session expired; sign in again and you will
+          drop straight back into the room.
         </p>
         <div className="mt-8 flex items-center gap-4">
           <AuthControls />
@@ -395,7 +395,7 @@ export default function RoomClient({ code }: { code: string }) {
   /* -------------------------------------------------------------- lobby */
 
   const playerCount = room?.players.length ?? 0;
-  const enoughPlayers = playerCount >= MIN_PLAYERS;
+  const enoughPlayers = !!room && playerCount >= room.maxPlayers;
   const hostCanStart =
     isHost &&
     (room?.phase === "lobby" || room?.phase === "countdown") &&
@@ -408,13 +408,13 @@ export default function RoomClient({ code }: { code: string }) {
       : room.phase === "playing"
         ? "Game starting - assigning roles..."
         : enoughPlayers
-          ? "Enough players are here. The host can start the run."
-          : `Waiting for ${MIN_PLAYERS - playerCount} more player${MIN_PLAYERS - playerCount === 1 ? "" : "s"}.`;
+          ? "All seats are filled. The ten-second countdown is starting."
+          : `Waiting for ${room.maxPlayers - playerCount} more player${room.maxPlayers - playerCount === 1 ? "" : "s"}.`;
   const startErrorMessage =
     startError === "not-host"
       ? "Host permission changed."
       : startError === "not-ready"
-        ? "Waiting for the minimum number of players."
+        ? "Waiting for every player to join."
         : startError === "started"
           ? "The run is already starting."
           : startError
@@ -520,7 +520,7 @@ export default function RoomClient({ code }: { code: string }) {
           <div className="border-l-4 border-[#3b63ff] pl-3 text-xs font-bold text-[#5a5960]" role="status" aria-live="polite">
             <span className="block">{waitingMessage}</span>
             <span className="mt-1 block font-mono text-[10px] uppercase tracking-widest text-[#77757a]">
-              {playerCount}/{room?.maxPlayers ?? "-"} players · minimum {MIN_PLAYERS}
+              {playerCount}/{room?.maxPlayers ?? "-"} players · all seats required
             </span>
           </div>
         )}

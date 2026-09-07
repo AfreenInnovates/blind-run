@@ -2,7 +2,6 @@ import { resolveRoom } from "../game/net/roles";
 import {
   COUNTDOWN_MS,
   MAX_PLAYERS,
-  MIN_PLAYERS,
   SPECTATOR_REJOIN_MS,
   type NetMessage,
   type PlayerInfo,
@@ -194,8 +193,8 @@ export function joinRoom(code: string, player: PlayerInfo): JoinResult {
     { ...player, connected: true, rejoinUntil: 0 },
   ];
   const hostId = room.hostId || player.id;
-  // the second player through the door starts the clock
-  const kickOff = room.phase === "lobby" && players.length >= MIN_PLAYERS;
+  // The room only starts once every configured seat is filled.
+  const kickOff = room.phase === "lobby" && players.length >= room.maxPlayers;
 
   return {
     ok: true,
@@ -242,7 +241,7 @@ export function leaveRoom(code: string, playerId: string) {
         ? players[0].id
         : room.hostId;
   const waitingAgain =
-    room.phase === "countdown" && players.length < MIN_PLAYERS;
+    room.phase === "countdown" && players.length < room.maxPlayers;
 
   publish({
     ...room,
@@ -288,10 +287,10 @@ export function startRoom(code: string, playerId: string): StartRoomResult {
   if (room.hostId !== playerId) return { ok: false, error: "not-host" };
   if (room.phase !== "lobby" && room.phase !== "countdown")
     return { ok: false, error: "started" };
-  if (room.players.length < MIN_PLAYERS)
+  if (room.players.length < room.maxPlayers)
     return { ok: false, error: "not-ready" };
 
-  publish({ ...room, phase: "countdown", startsAt: Date.now() + 1500 });
+  publish({ ...room, phase: "countdown", startsAt: Date.now() + COUNTDOWN_MS });
   return { ok: true };
 }
 
