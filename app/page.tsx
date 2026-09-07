@@ -48,7 +48,7 @@ export default function Home() {
             <Link href="/play" className="hidden text-[10px] font-bold uppercase tracking-[0.16em] text-[#6c6b70] md:block">Play Now</Link>
             <Link href="/rooms#join" className="hidden border-2 border-[#111216] px-4 py-2 text-[10px] font-black uppercase tracking-[0.16em] hover:bg-[#111216] hover:text-[#f2eee5] sm:block">Join a Room</Link>
             <AuthControls />
-            <Link href="/rooms" className="brutal-button px-4 py-2 text-[10px]">Create a Room</Link>
+            <Link href="/rooms" className="brutal-button px-4 py-2 text-[10px]">Play Game</Link>
           </div>
         </nav>
 
@@ -148,7 +148,7 @@ export default function Home() {
             {/* CTA + meta */}
             <div className="mt-6 flex flex-wrap items-end gap-6">
               <Link href="/rooms" className="brutal-button px-5 py-3">
-                Create a Room <span className="ml-2">&rarr;</span>
+                Play Game <span className="ml-2">&rarr;</span>
               </Link>
               <Link
                 href="/rooms#join"
