@@ -1,4 +1,4 @@
-import { resolveRoom } from "../game/net/roles";
+import { assignRoles, resolveRoom } from "../game/net/roles";
 import {
   COUNTDOWN_MS,
   MAX_PLAYERS,
@@ -193,14 +193,15 @@ export function joinRoom(code: string, player: PlayerInfo): JoinResult {
     { ...player, connected: true, rejoinUntil: 0 },
   ];
   const hostId = room.hostId || player.id;
+  const kickOff = room.phase === "lobby" && players.length >= room.maxPlayers;
   return {
     ok: true,
     room: publish({
       ...room,
       hostId,
       players,
-      phase: room.phase,
-      startsAt: room.startsAt,
+      phase: kickOff ? "countdown" : room.phase,
+      startsAt: kickOff ? Date.now() + COUNTDOWN_MS : room.startsAt,
     }),
   };
 }
@@ -287,7 +288,12 @@ export function startRoom(code: string, playerId: string): StartRoomResult {
   if (room.players.length < room.maxPlayers)
     return { ok: false, error: "not-ready" };
 
-  publish({ ...room, phase: "countdown", startsAt: Date.now() + COUNTDOWN_MS });
+  publish({
+    ...room,
+    phase: "playing",
+    startsAt: null,
+    players: assignRoles(room.players, room.seed),
+  });
   return { ok: true };
 }
 

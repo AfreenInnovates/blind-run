@@ -106,7 +106,7 @@ export default function RoomsPage() {
         </div>
 
         <section className="grid gap-4 py-10 sm:grid-cols-3">
-          {[['01', 'Make the room', 'Pick the number of seats and open the facility.'], ['02', 'Share the signal', 'Copy the generated room link and send it to your crew.'], ['03', 'Watch the draw', 'Once every seat is filled, the host starts the ten-second clock.']].map(([n, title, text]) => <div key={n} className="border-t-2 border-[#111216] pt-4"><span className="font-mono text-sm font-bold text-[#3b63ff]">{n}</span><h3 className="mt-2 text-sm font-black uppercase tracking-wide">{title}</h3><p className="mt-2 text-xs font-medium leading-relaxed text-[#66656a]">{text}</p></div>)}
+          {[['01', 'Make the room', 'Pick the number of seats and open the facility.'], ['02', 'Share the signal', 'Copy the generated room link to your full crew.'], ['03', 'Watch the draw', 'Every seat starts the ten-second clock. Start now skips the wait.']].map(([n, title, text]) => <div key={n} className="border-t-2 border-[#111216] pt-4"><span className="font-mono text-sm font-bold text-[#3b63ff]">{n}</span><h3 className="mt-2 text-sm font-black uppercase tracking-wide">{title}</h3><p className="mt-2 text-xs font-medium leading-relaxed text-[#66656a]">{text}</p></div>)}
         </section>
       </div>
     </main>

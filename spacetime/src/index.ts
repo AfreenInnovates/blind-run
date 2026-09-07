@@ -390,8 +390,15 @@ export const join_room = spacetimedb.reducer(
       connection_id: ctx.connectionId?.toHexString() ?? '',
     });
 
-    // Keep the full lobby open until the host starts the ten-second countdown.
-    if (!room.host) {
+    // Start the ten-second countdown as soon as every configured seat is filled.
+    if (room.phase === 'lobby' && seats + 1 >= room.max_players) {
+      ctx.db.game_room.code.update({
+        ...room,
+        host: room.host || identity,
+        phase: 'countdown',
+        starts_at: at + 10_000n,
+      });
+    } else if (!room.host) {
       ctx.db.game_room.code.update({ ...room, host: identity });
     }
   }
@@ -533,73 +540,62 @@ export const start_run = spacetimedb.reducer(
     for (const p of ctx.db.player.iter()) if (p.room_code === code) players++;
     if (players < room.max_players) throw new Error('all players must be present');
 
-    ctx.db.game_room.code.update({
-      ...room,
-      phase: 'countdown',
-      starts_at: nowMs(ctx.timestamp) + 10_000n,
-    });
+    drawRoles(ctx, code, true);
   }
 );
 
-/**
- * Draw the roles. Safe to call from any client once the clock has run out -
- * the result only depends on the room seed and the sorted player list, so
- * whoever calls it first writes what everyone else already predicted.
- */
+function drawRoles(ctx: HeistContext, code: string, allowEarly: boolean) {
+  const room = ctx.db.game_room.code.find(code);
+  if (!room || (room.phase !== 'countdown' && !(allowEarly && room.phase === 'lobby'))) return;
+  if (!allowEarly && nowMs(ctx.timestamp) < room.starts_at) throw new Error('too early');
+
+  const players = [...ctx.db.player.iter()]
+    .filter((p) => p.room_code === code)
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  if (players.length === 0) return;
+
+  const rng = mulberry32(room.seed);
+  const order = [...players];
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+
+  order.forEach((p, i) => {
+    ctx.db.player.id.update({
+      ...p,
+      role: i === 0 ? 'thief' : 'spectator',
+      watching: i === 0 ? '' : WATCHABLE[(i - 1) % WATCHABLE.length],
+    });
+  });
+
+  ctx.db.game_room.code.update({ ...room, phase: 'playing', starts_at: 0n });
+  ctx.db.thief_state.insert({
+    room_code: code,
+    x: 0,
+    y: 1.1,
+    z: 15.5,
+    yaw: 0,
+    area: 'outside',
+    hp: 100,
+    alarm: 0,
+    spotted: false,
+    keycard: false,
+    code_found: false,
+    vault_open: false,
+    alarm_disabled: false,
+    escaped: false,
+    loot: 0,
+    score: 0,
+    extra: '{}',
+    updated_at: nowMs(ctx.timestamp),
+  });
+}
+
+/** Draw roles after the automatic countdown expires. */
 export const draw_roles = spacetimedb.reducer(
   { code: t.string() },
-  (ctx, { code }) => {
-    const room = ctx.db.game_room.code.find(code);
-    if (!room || room.phase !== 'countdown') return;
-    if (nowMs(ctx.timestamp) < room.starts_at) throw new Error('too early');
-
-    const players = [...ctx.db.player.iter()]
-      .filter((p) => p.room_code === code)
-      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    if (players.length === 0) return;
-
-    const rng = mulberry32(room.seed);
-    const order = [...players];
-    for (let i = order.length - 1; i > 0; i--) {
-      const j = Math.floor(rng() * (i + 1));
-      [order[i], order[j]] = [order[j], order[i]];
-    }
-
-    order.forEach((p, i) => {
-      ctx.db.player.id.update({
-        ...p,
-        role: i === 0 ? 'thief' : 'spectator',
-        watching: i === 0 ? '' : WATCHABLE[(i - 1) % WATCHABLE.length],
-      });
-    });
-
-    ctx.db.game_room.code.update({
-      ...room,
-      phase: 'playing',
-      starts_at: 0n,
-    });
-
-    ctx.db.thief_state.insert({
-      room_code: code,
-      x: 0,
-      y: 1.1,
-      z: 15.5,
-      yaw: 0,
-      area: 'outside',
-      hp: 100,
-      alarm: 0,
-      spotted: false,
-      keycard: false,
-      code_found: false,
-      vault_open: false,
-      alarm_disabled: false,
-      escaped: false,
-      loot: 0,
-      score: 0,
-      extra: '{}',
-      updated_at: nowMs(ctx.timestamp),
-    });
-  }
+  (ctx, { code }) => drawRoles(ctx, code, false),
 );
 
 /** The thief's client owns the simulation and pushes the world here. */
