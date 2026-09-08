@@ -1,6 +1,7 @@
 "use client";
 
 import { runtime } from "./runtime";
+import { useSession } from "./session";
 import { useGame } from "./store";
 
 /**
@@ -15,6 +16,7 @@ import { useGame } from "./store";
 export function pressUse() {
   const game = useGame.getState();
   if (game.hp <= 0) return;
+  if (useSession.getState().net?.kind === "server") return;
   const target = runtime.useTarget;
   if (target?.kind === "keypad") game.tryKeypad();
   else if (target?.kind === "alarm") game.disableAlarm();
@@ -24,6 +26,10 @@ export function pressUse() {
 export function pressJump() {
   const game = useGame.getState();
   if (game.hp <= 0) return;
+  if (useSession.getState().net?.kind === "server") {
+    runtime.jumpAt = performance.now();
+    return;
+  }
   if (runtime.useTarget?.kind === "vent") {
     game.ventExit();
     return;

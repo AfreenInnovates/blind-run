@@ -21,6 +21,31 @@ import { ScheduleAt, SenderError, schema, table, t, type ReducerCtx } from 'spac
 
 const WATCHABLE = ['lobby', 'sec', 'vault'] as const;
 const SPECTATOR_REJOIN_MS = 20_000n;
+const AREAS = ['outside', 'entry', 'lobby', 'wcorr', 'ecorr', 'sec', 'vault', 'annex'] as const;
+const COMMAND_CODES = ['LEFT', 'RIGHT', 'FORWARD', 'BACK', 'RUN', 'HIDE', 'STOP'] as const;
+
+/** Discovery is room-scoped; clients cannot invent discoveries or scan another room. */
+const DISCOVERABLE_ROOMS: Record<string, (typeof WATCHABLE)[number]> = {
+  'keycard': 'sec',
+  'health': 'sec',
+  'sec-vent': 'sec',
+  'sec-trap': 'sec',
+  'alarm': 'sec',
+  'note': 'sec',
+  'sec-network': 'sec',
+  'sec-coffee': 'sec',
+  'bandages': 'lobby',
+  'lobby-guestlog': 'lobby',
+  'lobby-terminal': 'lobby',
+  'keypad': 'vault',
+  'vault-trap': 'vault',
+  'valuables': 'vault',
+  'vault-loot': 'vault',
+  'vault-vent': 'vault',
+  'vault-deposit-box': 'vault',
+  'sec-cam-b': 'sec',
+  'vault-cam-b': 'vault',
+};
 
 const spectatorGrace = table(
   { public: true },
@@ -184,6 +209,70 @@ function claim(claims: AuthClaims, key: string) {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+function validArea(value: string): value is (typeof AREAS)[number] {
+  return (AREAS as readonly string[]).includes(value);
+}
+
+function validCommandTone(value: string): boolean {
+  if (!value.startsWith('command:')) return false;
+  return (COMMAND_CODES as readonly string[]).includes(value.slice('command:'.length));
+}
+
+function finiteClamped(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) throw new SenderError('world state contains a non-finite number');
+  return Math.min(max, Math.max(min, value));
+}
+
+function safeWorldExtra(value: string): string {
+  if (value.length > 48_000) throw new SenderError('world state metadata is too large');
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      throw new SenderError('world state metadata must be an object');
+  } catch (error) {
+    if (error instanceof SenderError) throw error;
+    throw new SenderError('world state metadata is invalid');
+  }
+  return value;
+}
+
+function safeVoiceEvent(value: string, playerId: string, at: bigint): string {
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    const command = parsed.command;
+    const audioUrl = parsed.audioUrl;
+    if (
+      typeof parsed.id !== 'string' ||
+      !parsed.id ||
+      parsed.id.length > 128 ||
+      typeof command !== 'string' ||
+      !(COMMAND_CODES as readonly string[]).includes(command) ||
+      parsed.by !== playerId ||
+      audioUrl !== `/api/voice?kind=command&command=${encodeURIComponent(command)}`
+    )
+      throw new SenderError('invalid voice event');
+
+    return JSON.stringify({
+      id: parsed.id,
+      command,
+      by: playerId,
+      audioUrl,
+      t: Number(at),
+    });
+  } catch (error) {
+    if (error instanceof SenderError) throw error;
+    throw new SenderError('invalid voice event');
+  }
+}
+
+function requireActivePlayer(ctx: HeistContext, code: string) {
+  const room = ctx.db.game_room.code.find(code);
+  const player = ctx.db.player.id.find(`${code}:${ctx.sender.toHexString()}`);
+  if (!room || room.phase !== 'playing' || !player || !player.connected)
+    throw new SenderError('not in an active room');
+  return { room, player };
+}
+
 function profileFromAuth(ctx: HeistContext) {
   const claims = authClaims(ctx);
   if (!claims) return null;
@@ -235,7 +324,7 @@ function endRoom(ctx: HeistContext, code: string, result: string, text: string) 
   ctx.db.game_event.insert({
     id: 0n,
     room_code: code,
-    tone: 'bad',
+    tone: result === 'escaped' ? 'good' : 'bad',
     text,
     at,
   });
@@ -319,6 +408,7 @@ export const on_connect = spacetimedb.clientConnected((ctx) => {
 export const create_room = spacetimedb.reducer(
   { code: t.string(), max_players: t.u32(), seed: t.u32(), name: t.string() },
   (ctx, { code, max_players, seed, name }) => {
+    if (!/^[A-Z2-9]{5}$/.test(code)) throw new SenderError('room code must be five characters');
     if (ctx.db.game_room.code.find(code)) throw new Error('room code taken');
     const playerName = resolvePlayerName(ctx, name);
     const at = nowMs(ctx.timestamp);
@@ -627,39 +717,38 @@ export const publish_world = spacetimedb.reducer(
     extra: t.string(),
   },
   (ctx, args) => {
-    const room = ctx.db.game_room.code.find(args.code);
-    if (!room || room.phase !== 'playing') throw new Error('run is not active');
+    const { room, player } = requireActivePlayer(ctx, args.code);
+    if (player.role !== 'thief') throw new SenderError('only the connected thief publishes');
+    if (!validArea(args.area)) throw new SenderError('world state contains an unknown area');
 
-    const me = ctx.db.player.id.find(
-      `${args.code}:${ctx.sender.toHexString()}`
-    );
-    if (!me || me.role !== 'thief' || !me.connected)
-      throw new Error('only the connected thief publishes');
-
+    const current = ctx.db.thief_state.room_code.find(args.code);
     const row = {
       room_code: args.code,
-      x: args.x,
-      y: args.y,
-      z: args.z,
-      yaw: args.yaw,
+      x: finiteClamped(args.x, -30, 30),
+      y: finiteClamped(args.y, 0, 4),
+      z: finiteClamped(args.z, -14, 30),
+      yaw: finiteClamped(args.yaw, -Math.PI * 8, Math.PI * 8),
       area: args.area,
-      hp: args.hp,
-      alarm: args.alarm,
+      hp: finiteClamped(args.hp, 0, 100),
+      alarm: finiteClamped(args.alarm, 0, 100),
       spotted: args.spotted,
-      keycard: args.keycard,
-      code_found: args.code_found,
-      vault_open: args.vault_open,
-      alarm_disabled: args.alarm_disabled,
-      escaped: args.escaped,
-      loot: args.loot,
-      score: args.score,
-      extra: args.extra,
+      keycard: Boolean(current?.keycard || args.keycard),
+      code_found: Boolean(current?.code_found || args.code_found),
+      vault_open: Boolean(current?.vault_open || args.vault_open),
+      alarm_disabled: Boolean(current?.alarm_disabled || args.alarm_disabled),
+      escaped: Boolean(current?.escaped || args.escaped),
+      loot: Math.max(current?.loot ?? 0, Math.min(args.loot, 1_000_000)),
+      score: Math.max(current?.score ?? 0, Math.min(args.score, 10_000_000)),
+      extra: safeWorldExtra(args.extra),
       updated_at: nowMs(ctx.timestamp),
     };
 
-    if (ctx.db.thief_state.room_code.find(args.code))
+    if (current)
       ctx.db.thief_state.room_code.update(row);
     else ctx.db.thief_state.insert(row);
+
+    if (row.escaped) endRoom(ctx, room.code, 'escaped', 'THE THIEF GOT OUT.');
+    else if (row.hp <= 0) endRoom(ctx, room.code, 'down', 'THE THIEF WENT DOWN.');
   }
 );
 
@@ -668,10 +757,11 @@ export const discover_item = spacetimedb.reducer(
   { code: t.string(), item_id: t.string() },
   (ctx, { code, item_id }) => {
     const identity = ctx.sender.toHexString();
-    const room = ctx.db.game_room.code.find(code);
-    const me = ctx.db.player.id.find(`${code}:${identity}`);
-    if (!room || room.phase !== 'playing' || !me || !me.connected)
-      throw new Error('not in an active room');
+    const { player } = requireActivePlayer(ctx, code);
+    const itemRoom = DISCOVERABLE_ROOMS[item_id];
+    if (!itemRoom) throw new SenderError('unknown discovery');
+    if (player.role !== 'spectator' || player.watching !== itemRoom)
+      throw new SenderError('discovery is outside your assigned room');
 
     const id = `${code}:${item_id}`;
     if (ctx.db.discovered_item.id.find(id)) return;
@@ -688,7 +778,7 @@ export const discover_item = spacetimedb.reducer(
       id: 0n,
       room_code: code,
       tone: 'good',
-      text: `${me.name} scanned ${item_id}`,
+      text: `${player.name} scanned ${item_id}`,
       at,
     });
   }
@@ -697,22 +787,31 @@ export const discover_item = spacetimedb.reducer(
 export const log_event = spacetimedb.reducer(
   { code: t.string(), tone: t.string(), text: t.string() },
   (ctx, { code, tone, text }) => {
-    const room = ctx.db.game_room.code.find(code);
-    const me = ctx.db.player.id.find(`${code}:${ctx.sender.toHexString()}`);
-    if (
-      !room ||
-      room.phase !== 'playing' ||
-      !me ||
-      me.role !== 'spectator' ||
-      !me.connected ||
-      (!tone.startsWith('command:') && tone !== 'voice')
-    )
-      throw new Error('only an active spectator can command');
+    const { player } = requireActivePlayer(ctx, code);
+    if (player.role !== 'spectator') throw new SenderError('only an active spectator can command');
+
+    const thiefState = ctx.db.thief_state.room_code.find(code);
+    if (!thiefState || player.watching !== thiefState.area)
+      throw new SenderError('your assigned room is off air');
+
+    const eventTone = tone;
+    let eventText = text;
+    if (validCommandTone(tone)) {
+      eventText = player.id;
+    } else if (tone === 'voice') {
+      eventText = safeVoiceEvent(text, player.id, nowMs(ctx.timestamp));
+    } else {
+      throw new SenderError('invalid command event');
+    }
+
+    if (eventTone.length > 32 || eventText.length > 512)
+      throw new SenderError('command event is too large');
+
     ctx.db.game_event.insert({
       id: 0n,
       room_code: code,
-      tone,
-      text,
+      tone: eventTone,
+      text: eventText,
       at: nowMs(ctx.timestamp),
     });
   }
@@ -737,13 +836,24 @@ export const end_run = spacetimedb.reducer(
   (ctx, { code, result }) => {
     const room = ctx.db.game_room.code.find(code);
     if (!room || room.phase === 'ended') return;
-    ctx.db.game_room.code.update({ ...room, phase: 'ended', result });
-    ctx.db.game_event.insert({
-      id: 0n,
-      room_code: code,
-      tone: result === 'escaped' ? 'good' : 'bad',
-      text: result === 'escaped' ? 'The thief got out.' : 'The thief went down.',
-      at: nowMs(ctx.timestamp),
-    });
+    if (result !== 'escaped' && result !== 'down')
+      throw new SenderError('invalid run result');
+
+    const { player } = requireActivePlayer(ctx, code);
+    if (player.role !== 'thief') throw new SenderError('only the thief can end the run');
+
+    const thiefState = ctx.db.thief_state.room_code.find(code);
+    if (!thiefState) throw new SenderError('run state is unavailable');
+    if (result === 'escaped' && !thiefState.escaped)
+      throw new SenderError('escape has not been confirmed');
+    if (result === 'down' && thiefState.hp > 0)
+      throw new SenderError('the thief is still standing');
+
+    endRoom(
+      ctx,
+      code,
+      result,
+      result === 'escaped' ? 'THE THIEF GOT OUT.' : 'THE THIEF WENT DOWN.',
+    );
   }
 );

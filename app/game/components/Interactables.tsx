@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import { CuboidCollider } from "@react-three/rapier";
 import * as THREE from "three";
 import { MARKERS, type MarkerDef } from "../level";
+import { useSession } from "../session";
 import { useGame } from "../store";
 import { Label, MarkerOverlay, NeonBox, useMarker } from "./Markers";
 
@@ -13,6 +14,8 @@ const byId = (id: string) => MARKERS.find((m) => m.id === id) as MarkerDef;
 function isThief(other: { rigidBodyObject?: THREE.Object3D | null }) {
   return other.rigidBodyObject?.userData?.tag === "thief";
 }
+
+const localSimulation = () => useSession.getState().net?.kind !== "server";
 
 /* ------------------------------------------------------------------ keypad */
 
@@ -101,7 +104,7 @@ function MedPickup({ id, heal }: { id: string; heal: number }) {
         args={[0.6, 0.8, 0.6]}
         sensor
         onIntersectionEnter={({ other }) => {
-          if (!isThief(other)) return;
+          if (!isThief(other) || !localSimulation()) return;
           collect(id, def.label);
           doHeal(heal, def.label.toLowerCase());
         }}
@@ -151,7 +154,7 @@ function Keycard() {
         args={[0.7, 0.9, 0.7]}
         sensor
         onIntersectionEnter={({ other }) => {
-          if (!isThief(other)) return;
+          if (!isThief(other) || !localSimulation()) return;
           collect("keycard", "Keycard");
         }}
       />
@@ -232,7 +235,7 @@ function FloorTrap({ id }: { id: string }) {
         args={[1.2, 0.6, 1.2]}
         sensor
         onIntersectionEnter={({ other }) => {
-          if (!isThief(other)) return;
+          if (!isThief(other) || !localSimulation()) return;
           const now = performance.now() / 1000;
           if (now - last.current < 2) return;
           last.current = now;
@@ -356,7 +359,7 @@ function Valuables() {
         args={[1.1, 1.1, 1.1]}
         sensor
         onIntersectionEnter={({ other }) => {
-          if (!isThief(other)) return;
+          if (!isThief(other) || !localSimulation()) return;
           collect("valuables", "Valuables", 150);
         }}
       />
@@ -407,7 +410,7 @@ function VaultLoot() {
           args={[1.6, 1.2, 1.0]}
           sensor
           onIntersectionEnter={({ other }) => {
-            if (!isThief(other)) return;
+            if (!isThief(other) || !localSimulation()) return;
             collect("vault-loot", "the vault contents", 500);
           }}
         />

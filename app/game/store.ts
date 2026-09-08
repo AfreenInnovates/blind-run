@@ -118,6 +118,8 @@ export interface GameState {
   reset: () => void;
   /** spectators mirror the thief client's world */
   applySnapshot: (s: Snapshot) => void;
+  /** Colyseus authoritative state for the local thief, without hidden discoveries. */
+  applyAuthoritativeSnapshot: (s: Snapshot) => void;
   addIntel: (n: number) => void;
   spendIntel: (n: number) => void;
   applyPowerUp: (effect: "heal" | "invis", by: string) => void;
@@ -358,12 +360,38 @@ export const useGame = create<GameState>()((set, get) => ({
       ventOpen: snap.ventOpen,
       alarmDisabled: snap.alarmDisabled,
       escaped: snap.escaped,
+      escapedVia: snap.escapedVia,
       loot: snap.loot,
       score: snap.score,
       collected: toMap(snap.collected),
       discovered: toMap(snap.discovered),
       doorsOpen: toMap(snap.doorsOpen),
       explored: toMap(snap.explored) as Partial<Record<RoomId, boolean>>,
+      log: snap.log,
+    });
+  },
+
+  applyAuthoritativeSnapshot: (snap) => {
+    const toMap = (ids: string[]) =>
+      Object.fromEntries(ids.map((i) => [i, true]));
+    set({
+      hp: snap.hp,
+      alarm: snap.alarm,
+      spotted: snap.spotted,
+      room: snap.room,
+      thiefXZ: [snap.thief[0], snap.thief[2]],
+      thiefYaw: snap.thief[3],
+      keycard: snap.keycard,
+      codeFound: snap.codeFound,
+      vaultOpen: snap.vaultOpen,
+      ventOpen: snap.ventOpen,
+      alarmDisabled: snap.alarmDisabled,
+      escaped: snap.escaped,
+      escapedVia: snap.escapedVia,
+      loot: snap.loot,
+      score: snap.score,
+      collected: toMap(snap.collected),
+      doorsOpen: toMap(snap.doorsOpen),
       log: snap.log,
     });
   },

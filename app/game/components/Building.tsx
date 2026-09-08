@@ -17,6 +17,7 @@ import {
   type WallDef,
 } from "../level";
 import { clampDt, runtime } from "../runtime";
+import { useSession } from "../session";
 import { useGame, useRoomVisible } from "../store";
 import { Label } from "./Markers";
 
@@ -144,13 +145,14 @@ function Shell() {
 function Door({ def }: { def: DoorDef }) {
   const open = useGame((s) => !!s.doorsOpen[def.id]);
   const keycard = useGame((s) => s.keycard);
+  const serverAuthoritative = useSession((s) => s.net?.kind === "server");
   const openDoor = useGame((s) => s.openDoor);
   const pivot = useRef<THREE.Group>(null);
   const [x, , z] = def.at;
 
   useFrame((_, rawDt) => {
     const dt = clampDt(rawDt);
-    if (!open) {
+    if (!serverAuthoritative && !open) {
       const near =
         Math.hypot(runtime.thief.x - x, runtime.thief.z - z) < 2.1 &&
         (!def.lock || keycard);

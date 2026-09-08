@@ -13,6 +13,8 @@ import { roomAt, THIEF_SPAWN } from "../level";
 import { pressJump, pressUse } from "../controls";
 import { clampDt, runtime } from "../runtime";
 import { useGame, useIsHost } from "../store";
+import { useSession } from "../session";
+import type { InputFrame } from "../../../packages/contracts/src";
 import { Label, NeonBox } from "./Markers";
 
 export type Controls =
@@ -102,11 +104,15 @@ function LocalThief() {
   const overlay = useRef<THREE.Group>(null);
   const eyeTarget = useRef(new THREE.Vector3());
   const bobT = useRef(0);
+  const inputSeq = useRef(0);
+  const inputAcc = useRef(0);
   const [sub, get] = useKeyboardControls<Controls>();
 
   const view = useGame((s) => s.view);
   const hp = useGame((s) => s.hp);
   const resetSeq = useGame((s) => s.resetSeq);
+  const serverAuthoritative = useSession((s) => s.net?.kind === "server");
+  const onSnapshot = useSession((s) => s.onSnapshot);
   const firstPerson = view === "thief";
 
   // the on-screen buttons call the same two functions, so a thumb and a key
@@ -139,6 +145,17 @@ function LocalThief() {
     rb.setLinvel({ x: 0, y: 0, z: 0 }, true);
     eyeTarget.current.set(THIEF_SPAWN[0], THIEF_SPAWN[1] + EYE, THIEF_SPAWN[2]);
   }, [resetSeq]);
+
+  useEffect(() => {
+    if (!serverAuthoritative) return;
+    return onSnapshot((snapshot) => {
+      body.current?.setTranslation(
+        { x: snapshot.thief[0], y: snapshot.thief[1], z: snapshot.thief[2] },
+        true,
+      );
+      body.current?.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    });
+  }, [onSnapshot, serverAuthoritative]);
 
   useFrame((state, rawDt) => {
     const rb = body.current;
@@ -203,6 +220,23 @@ function LocalThief() {
     // left. Only the top-down views fall back to the travel direction.
     if (firstPerson) runtime.thiefYaw = Math.atan2(fwd.x, fwd.z);
     else if (moving) runtime.thiefYaw = Math.atan2(move.x, move.z);
+
+    if (serverAuthoritative) {
+      inputAcc.current += dt;
+      if (inputAcc.current >= 1 / 30) {
+        inputAcc.current = 0;
+        const input: InputFrame = {
+          seq: inputSeq.current++,
+          moveX: move.x,
+          moveZ: move.z,
+          yaw: runtime.thiefYaw,
+          run: down.sprint,
+          jump: wantsJump,
+          interact: down.use,
+        };
+        useSession.getState().sendInput(input);
+      }
+    }
     if (visual.current) {
       visual.current.rotation.y = runtime.thiefYaw;
       bobT.current += moving ? dt * (down.sprint ? 12 : 8) : 0;

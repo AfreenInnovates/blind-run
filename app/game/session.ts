@@ -6,6 +6,7 @@ import { resolveRoom } from "./net/roles";
 import { channelOpen } from "./level";
 import { useGame } from "./store";
 import type { CommandCode } from "./commands";
+import type { InputFrame } from "../../packages/contracts/src";
 import {
   MAX_PLAYERS,
   newId,
@@ -51,6 +52,7 @@ interface SessionState {
   sendDiscover: (itemId: string) => void;
   sendCommand: (command: CommandCode) => void;
   publish: (snap: Snapshot) => void;
+  sendInput: (input: InputFrame) => void;
   onSnapshot: (cb: (s: Snapshot) => void) => () => void;
   onDiscover: (cb: (itemId: string) => void) => () => void;
   onCommand: (cb: (command: CommandCode, by: string) => void) => () => void;
@@ -120,6 +122,9 @@ export const useSession = create<SessionState>()((set, get) => ({
         }
         case "world": {
           set({ lastSnapshot: msg.snap, lastSnapshotAt: Date.now() });
+          if (get().net?.kind === "server") {
+            useGame.getState().applyAuthoritativeSnapshot(msg.snap);
+          }
           for (const cb of snapshotSubs) cb(msg.snap);
           break;
         }
@@ -146,7 +151,7 @@ export const useSession = create<SessionState>()((set, get) => ({
     try {
       await net.connect(code);
       if (seedRoom) {
-        const created = await net.createRoom({ ...seedRoom, hostId: "" });
+        const created = await net.createRoom({ ...seedRoom, hostId: "" }, me);
         if (!created) {
           const refusal = (
             (net as { lastError?: string }).lastError ?? ""
@@ -299,6 +304,10 @@ export const useSession = create<SessionState>()((set, get) => ({
 
   publish: (snap) => {
     get().net?.send({ type: "world", snap });
+  },
+
+  sendInput: (input) => {
+    get().net?.sendInput?.(input);
   },
 
   onSnapshot: (cb) => {

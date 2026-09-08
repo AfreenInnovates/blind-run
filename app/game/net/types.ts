@@ -1,5 +1,6 @@
 import type { RoomId } from "../level";
 import type { CommandCode } from "../commands";
+import type { InputFrame } from "../../../packages/contracts/src";
 
 export type Role = "thief" | "spectator";
 export type Phase = "lobby" | "countdown" | "playing" | "ended";
@@ -67,6 +68,7 @@ export interface Snapshot {
   ventOpen: boolean;
   alarmDisabled: boolean;
   escaped: boolean;
+  escapedVia: "entrance" | "vent" | null;
   down: boolean;
   loot: number;
   score: number;
@@ -116,7 +118,7 @@ export interface NetClient {
   /** open the live stream for a room */
   connect(code: string): Promise<void>;
   disconnect(intentional?: boolean): void;
-  createRoom(room: RoomState): Promise<RoomState | null>;
+  createRoom(room: RoomState, player?: PlayerInfo): Promise<RoomState | null>;
   join(
     code: string,
     player: PlayerInfo,
@@ -125,6 +127,8 @@ export interface NetClient {
   start(code: string, playerId: string): Promise<StartResult>;
   /** fan-out only: world snapshots and scans */
   send(msg: NetMessage): void;
+  /** authoritative match input; legacy transports intentionally do not implement it */
+  sendInput?(input: InputFrame): void;
   onMessage(cb: (m: NetMessage) => void): () => void;
 }
 

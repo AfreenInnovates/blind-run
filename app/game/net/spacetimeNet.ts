@@ -23,7 +23,13 @@ const COMMAND_CODES: CommandCode[] = ["LEFT", "RIGHT", "FORWARD", "BACK", "RUN",
 
 type SnapshotExtra = Pick<
   Snapshot,
-  "guards" | "cams" | "collected" | "doorsOpen" | "explored" | "ventOpen"
+  | "guards"
+  | "cams"
+  | "collected"
+  | "doorsOpen"
+  | "explored"
+  | "ventOpen"
+  | "escapedVia"
 >;
 
 type RoomWaiter = {
@@ -411,6 +417,7 @@ export class SpacetimeNet implements NetClient {
       vaultOpen: ts.vaultOpen,
       alarmDisabled: ts.alarmDisabled,
       escaped: ts.escaped,
+      escapedVia: extra.escapedVia ?? null,
       down: ts.hp <= 0,
       loot: ts.loot,
       score: ts.score,
@@ -441,9 +448,10 @@ export class SpacetimeNet implements NetClient {
     this.listeners.clear();
   }
 
-  async createRoom(room: RoomState): Promise<RoomState | null> {
+  async createRoom(room: RoomState, player?: PlayerInfo): Promise<RoomState | null> {
     const conn = this.conn;
     if (!conn) return null;
+    if (player) this.playerName = player.name;
     try {
       // Guest-friendly: pass the player name so the module can use it even
       // without a Google profile. Auth profiles still take priority server-side.
@@ -535,6 +543,7 @@ export class SpacetimeNet implements NetClient {
           doorsOpen: snap.doorsOpen,
           explored: snap.explored,
           ventOpen: snap.ventOpen,
+          escapedVia: snap.escapedVia,
         }),
       });
     } else if (msg.type === "discover") {

@@ -14,6 +14,7 @@ import {
   type MarkerDef,
 } from "../level";
 import { clampDt, guardState, runtime } from "../runtime";
+import { useSession } from "../session";
 import { useGame } from "../store";
 
 const pos = (id: string) =>
@@ -44,6 +45,7 @@ export default function Systems() {
   const acc = useRef(0);
   const alarm = useRef(0);
   const resetSeq = useGame((s) => s.resetSeq);
+  const serverAuthoritative = useSession((s) => s.net?.kind === "server");
 
   useEffect(() => {
     alarm.current = 0;
@@ -91,6 +93,58 @@ export default function Systems() {
     const dt = clampDt(rawDt);
     const store = useGame.getState();
     if (store.escaped) return;
+
+    if (serverAuthoritative) {
+      runtime.room = roomAt(runtime.thief.x, runtime.thief.z);
+      runtime.alert = store.alarm;
+      runtime.seenBy.clear();
+
+      const ventFound = store.ventOpen || !!store.discovered["vault-vent"];
+      let useTarget: typeof runtime.useTarget = null;
+      if (ventFound && flat(runtime.thief, ventPos) < 2.6)
+        useTarget = { kind: "vent", id: "vault-vent" };
+      else if (flat(runtime.thief, keypadPos) < 2.2 && !store.vaultOpen)
+        useTarget = { kind: "keypad", id: "keypad" };
+      else if (flat(runtime.thief, alarmPos) < 2.2 && !store.alarmDisabled)
+        useTarget = { kind: "alarm", id: "alarm" };
+      runtime.useTarget = useTarget;
+
+      let lockedNear: string | null = null;
+      for (const d of DOORS) {
+        if (!d.lock || store.keycard || store.doorsOpen[d.id]) continue;
+        if (Math.hypot(runtime.thief.x - d.at[0], runtime.thief.z - d.at[2]) < 2.4)
+          lockedNear = d.label;
+      }
+
+      acc.current += dt;
+      if (acc.current > 0.08) {
+        acc.current = 0;
+        store.enterRoom(runtime.room);
+        const gotLoot = !!store.collected["vault-loot"];
+        const prompt =
+          useTarget?.kind === "vent"
+            ? gotLoot
+              ? "Press Space to jump into the vent - you have the loot"
+              : "Press Space to jump into the vent and get out"
+            : useTarget?.kind === "keypad"
+              ? store.keycard || store.codeFound
+                ? "Press E to use the keypad - it opens the vault and the vent"
+                : "Press E - the keypad needs the keycard from the security room"
+              : useTarget?.kind === "alarm"
+                ? "Press E to disable the alarm panel"
+                : lockedNear
+                  ? `${lockedNear} is locked - the keycard is in the security room`
+                  : ventFound
+                    ? gotLoot
+                      ? "Vent is open on the east wall - jump in (Space) to get out"
+                      : "Vault is open. Grab the contents, then jump into the vent on the east wall"
+                    : gotLoot
+                      ? "Get back out through the entrance"
+                      : null;
+        store.setPrompt(prompt);
+      }
+      return;
+    }
 
     /* --- which room are we in --------------------------------------- */
     runtime.room = roomAt(runtime.thief.x, runtime.thief.z);

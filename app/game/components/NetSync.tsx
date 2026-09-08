@@ -21,6 +21,7 @@ const keys = (m: Record<string, boolean>) =>
 export default function NetSync() {
   const isHost = useIsHost();
   const inRoom = useGame((s) => s.mode.kind !== "solo");
+  const netKind = useSession((s) => s.net?.kind ?? null);
   const publish = useSession((s) => s.publish);
   const onSnapshot = useSession((s) => s.onSnapshot);
   const onDiscover = useSession((s) => s.onDiscover);
@@ -57,7 +58,7 @@ export default function NetSync() {
   }, [isHost, inRoom, onSnapshot]);
 
   useFrame((_, dt) => {
-    if (!isHost || !inRoom) return;
+    if (!isHost || !inRoom || netKind === "server") return;
     acc.current += dt;
     if (acc.current < 1 / PUBLISH_HZ) return;
     acc.current = 0;
@@ -91,6 +92,7 @@ export default function NetSync() {
       ventOpen: s.ventOpen,
       alarmDisabled: s.alarmDisabled,
       escaped: s.escaped,
+      escapedVia: s.escapedVia,
       down: s.hp <= 0,
       loot: s.loot,
       score: s.score,

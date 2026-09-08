@@ -6,6 +6,7 @@ import { CuboidCollider, RigidBody } from "@react-three/rapier";
 import * as THREE from "three";
 import { clampDt } from "../runtime";
 import { useGame } from "../store";
+import { VAULT_DOOR } from "../level";
 import {
   Cabinet,
   CeilingLight,
@@ -318,7 +319,10 @@ function VaultDoor() {
 
       {/* the shut door is solid */}
       {!open && (
-        <CuboidCollider position={[15, 1.5, -6.9]} args={[1.8, 1.5, 0.2]} />
+        <CuboidCollider
+          position={[VAULT_DOOR.x, 1.5, VAULT_DOOR.z]}
+          args={[VAULT_DOOR.halfX, 1.5, VAULT_DOOR.halfZ]}
+        />
       )}
     </group>
   );

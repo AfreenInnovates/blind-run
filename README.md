@@ -90,20 +90,20 @@ not a requirement - a run is always finishable with the keycard alone.
 
 ## How the multiplayer works
 
-The thief's client owns the simulation — physics, guards, detection — and publishes a snapshot
-12 times a second (transform, guards, camera yaws, alarm, flags, log). Spectators never step the
-physics world; they fold each snapshot back into the same runtime the renderers already read, and
-send `discover` messages the other way.
+The authoritative Colyseus path receives thief input, steps physics, guards and detection on the
+match server, and publishes role-scoped world snapshots 12 times a second. Spectators never step
+the physics world; they fold each snapshot back into the same runtime the renderers already read,
+and send validated `discover` and command messages the other way. Colyseus rooms retain a
+disconnected player for twenty seconds so a normal network drop can rejoin the same session.
 
 Transports sit behind one small interface (`app/game/net/types.ts`):
 
 - **`spacetime` (default)** — rooms and world snapshots use the published SpacetimeDB module.
-  This is the deployment transport and works across browsers and devices.
-- **`server` (opt-in)** — set `NEXT_PUBLIC_NET_TRANSPORT=server` to use the in-memory
-  Next server and SSE stream from `app/lib/roomStore.ts` and `app/api/rooms/*`. Only usable
-  against a single long-lived `next dev` process: the rooms live in that process's memory, so
-  on a serverless deployment the thief's snapshots and the spectators' streams land in
-  different instances and spectator views never update.
+  This remains available for compatibility with the published module.
+- **`colyseus` (authoritative)** — set `NEXT_PUBLIC_MATCH_TRANSPORT=colyseus` and point
+  `NEXT_PUBLIC_COLYSEUS_URL` at the long-lived match server. This is the production path for
+  server-owned Crew matches; it must run as a WebSocket-capable service, not as a serverless
+  request function.
 
 ## SpacetimeDB
 
@@ -149,7 +149,9 @@ app/
 ```
 
 ```
-spacetime/               SpacetimeDB module (tables + reducers)
+  spacetime/               SpacetimeDB module (tables + reducers)
+  packages/                shared contracts, layout and deterministic simulation
+  server/                  authoritative Colyseus room and production entrypoint
 docs/, HACKATHON_SPEC.md the original design notes
   game/
     GameShell.tsx        HUD: role, layer switch, minimap, discovery panel, log
@@ -186,6 +188,21 @@ Three rules keep the layers honest:
   not the minimap's guard dots.
 
 ## Deployment
+
+The production Colyseus topology has two services:
+
+1. Deploy the Next.js frontend with `npm run build` and `npm run start`.
+2. Deploy the long-lived match process with `npm run server:start`.
+3. Set the frontend `NEXT_PUBLIC_COLYSEUS_URL` to the public HTTPS origin of the match service.
+   The Colyseus client upgrades that endpoint to secure WebSockets in production.
+4. Configure the match service `HOST=0.0.0.0` and a platform-provided `PORT`.
+5. Configure the platform health check as `GET /healthz`; it returns a JSON `ok` response only
+   after the Colyseus HTTP/WebSocket service is listening.
+
+Do not use the local `http://localhost:2567` fallback in production. The client intentionally
+fails with a clear configuration error when `NEXT_PUBLIC_COLYSEUS_URL` is missing from a production
+build. Copy `.env.example` to the deployment platform's environment settings and provide secrets
+there; never commit `.env` or provider keys.
 
 Production Google sign-in requires these public Vercel variables:
 

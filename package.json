@@ -6,12 +6,20 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "tsx --test tests/**/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "typecheck:spacetime": "tsc --noEmit -p spacetime/tsconfig.json",
+    "server:dev": "tsx server/dev.ts",
+    "server:start": "tsx server/start.ts"
   },
   "dependencies": {
+    "@colyseus/schema": "^5.0.27",
+    "@colyseus/sdk": "^0.18.2",
     "@react-three/drei": "^10.7.8",
     "@react-three/fiber": "^9.7.0",
     "@react-three/rapier": "^2.2.0",
+    "colyseus": "^0.18.5",
     "next": "16.3.4",
     "openai": "^7.10.0",
     "react": "19.2.8",
@@ -19,6 +27,7 @@
     "react-oidc-context": "^3.3.1",
     "spacetimedb": "^2.10.0",
     "three": "^0.185.1",
+    "tsx": "^4.23.13",
     "zustand": "^5.0.15"
   },
   "devDependencies": {
@@ -31,5 +40,8 @@
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "engines": {
+    "node": ">=20.9.0"
   }
 }
