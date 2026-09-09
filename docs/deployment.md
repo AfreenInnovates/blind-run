@@ -46,7 +46,11 @@ through Colyseus graceful shutdown so active rooms are not abandoned during a no
 
 `.env.example` contains the complete variable names without credentials. Provider secrets belong in
 the deployment platform, not in git. `NEXT_PUBLIC_COLYSEUS_URL` has a localhost fallback only in
-development; a production build fails clearly instead of silently trying to connect to localhost.
+development. A production build still succeeds without it: the check lives in `ColyseusNet.connect`,
+so the failure surfaces at runtime, when the first player tries to join a room and the client throws
+`NEXT_PUBLIC_COLYSEUS_URL is required for production matches`. Set it whenever
+`NEXT_PUBLIC_MATCH_TRANSPORT=colyseus` is set, and confirm with the smoke checks below rather than
+treating a green build as proof the transport is configured.
 
 The match service must be a persistent WebSocket-capable process. Do not deploy it as a stateless
 serverless function: active room state and the fixed-timestep simulation live in that process.
