@@ -100,7 +100,6 @@ export type JoinFailure =
   | "notfound"
   | "full"
   | "unavailable"
-  | "auth"
   | "timeout"
   | "connection";
 export type StartFailure = "notfound" | "not-host" | "not-ready" | "started";

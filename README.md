@@ -199,19 +199,13 @@ The production Colyseus topology has two services:
 5. Configure the platform health check as `GET /healthz`; it returns a JSON `ok` response only
    after the Colyseus HTTP/WebSocket service is listening.
 
-Do not use the local `http://localhost:2567` fallback in production. The client intentionally
-fails with a clear configuration error when `NEXT_PUBLIC_COLYSEUS_URL` is missing from a production
-build. Copy `.env.example` to the deployment platform's environment settings and provide secrets
-there; never commit `.env` or provider keys.
+Do not use the local `http://localhost:2567` fallback in production. A production build still
+succeeds when `NEXT_PUBLIC_COLYSEUS_URL` is missing - the check lives in `ColyseusNet.connect`, so
+the error surfaces at runtime, on the first attempt to join a room. Copy `.env.example` to the
+deployment platform's environment settings and provide secrets there; never commit `.env` or
+provider keys.
 
-Production Google sign-in requires these public Vercel variables:
-
-```text
-NEXT_PUBLIC_SPACETIME_AUTH_CLIENT_ID=your-spacetimeauth-client-id
-NEXT_PUBLIC_SITE_URL=https://your-production-domain
-```
-
-Enable Google in the SpacetimeAuth project and allow `https://your-production-domain/` as the
-client redirect and post-logout URI. Publish the module with an account that owns or collaborates
-on `one-heist-spacetime` before deploying the frontend, because the counter and profile tables are
-part of the client schema.
+There is no sign-in. A room is open to anyone holding the link, so no auth client id and no
+redirect origin are needed. Publish the module with an account that owns or collaborates on
+`one-heist-spacetime` before deploying the frontend, because the counter tables are part of the
+client schema.

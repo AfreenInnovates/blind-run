@@ -16,7 +16,7 @@ import type {
   VoiceTransmission,
 } from "./types";
 import { WATCHABLE } from "./types";
-import { SPACETIME_AUTH_TOKEN_KEY } from "../../lib/auth";
+import { tokenIsExpired } from "../../lib/auth";
 
 const PHASES: Phase[] = ["lobby", "countdown", "playing", "ended"];
 const COMMAND_CODES: CommandCode[] = ["LEFT", "RIGHT", "FORWARD", "BACK", "RUN", "HIDE", "STOP"];
@@ -45,35 +45,9 @@ const roomId = (value: string): RoomId | null =>
 const phase = (value: string): Phase =>
   PHASES.includes(value as Phase) ? (value as Phase) : "lobby";
 
-function tokenIsExpired(token: string) {
-  try {
-    const encoded = token.split(".")[1];
-    if (!encoded) return false;
-    const payload = JSON.parse(
-      atob(encoded.replace(/-/g, "+").replace(/_/g, "/")),
-    ) as { exp?: unknown };
-    return typeof payload.exp === "number" && payload.exp <= Date.now() / 1000;
-  } catch {
-    return false;
-  }
-}
-
 const joinFailure = (error: unknown): JoinFailure => {
   const message = error instanceof Error ? error.message : String(error);
   const lower = message.toLowerCase();
-  // the module refuses anyone it has no profile for. That is not a missing
-  // room, and calling it one sent people hunting for a room code that was
-  // fine - it means the connection carried no signed-in identity, usually a
-  // token that expired while the tab was open.
-  if (
-    lower.includes("sign in") ||
-    lower.includes("profile") ||
-    lower.includes("unauthorized") ||
-    lower.includes("invalid token") ||
-    lower.includes("jwt") ||
-    lower.includes("401")
-  )
-    return "auth";
   if (lower.includes("full")) return "full";
   if (lower.includes("started") || lower.includes("over") || lower.includes("countdown"))
     return "unavailable";
@@ -174,19 +148,14 @@ export class SpacetimeNet implements NetClient {
     const database = process.env.NEXT_PUBLIC_SPACETIME_MODULE_NAME || "one-heist-spacetime";
     const tokenKey = `heist:spacetime-token:${host}:${database}:${identitySuffix()}`;
     let token = "";
-    let authenticated = false;
     try {
-      // Prefer the OIDC auth token if the user is signed in (optional,
-      // enriches the experience). Otherwise use a cached anonymous token
-      // so the tab can reclaim its seat across refreshes. Guest access
-      // works without any stored token — SpacetimeDB issues one on connect.
-      token = localStorage.getItem(SPACETIME_AUTH_TOKEN_KEY) ?? "";
-      authenticated = Boolean(token);
-      if (!authenticated) token = localStorage.getItem(tokenKey) ?? "";
+      // There is no sign-in. A cached anonymous token only lets this tab
+      // reclaim the seat it already holds across a refresh; SpacetimeDB issues
+      // a fresh identity to anyone who arrives without one.
+      token = localStorage.getItem(tokenKey) ?? "";
       if (token && tokenIsExpired(token)) {
-        if (authenticated) localStorage.removeItem(SPACETIME_AUTH_TOKEN_KEY);
+        localStorage.removeItem(tokenKey);
         token = "";
-        authenticated = false;
       }
     } catch {
       /* anonymous identity can still connect without persistence */
@@ -209,7 +178,7 @@ export class SpacetimeNet implements NetClient {
           void connectedConn;
           this.identity = identity.toHexString();
            try {
-             if (!authenticated) localStorage.setItem(tokenKey, nextToken);
+             localStorage.setItem(tokenKey, nextToken);
           } catch {
             /* private browsing can still use this live connection */
           }

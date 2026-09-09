@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { DbConnection } from "../game/net/spacetime";
-import { SPACETIME_AUTH_TOKEN_KEY } from "../lib/auth";
+import { tokenIsExpired } from "../lib/auth";
 
 /**
  * The live "moonshots landed" figure.
@@ -27,15 +27,17 @@ export default function LandingCounter() {
       process.env.NEXT_PUBLIC_SPACETIME_HOST || "wss://maincloud.spacetimedb.com";
     const database =
       process.env.NEXT_PUBLIC_SPACETIME_MODULE_NAME || "one-heist-spacetime";
-    // Signed in or not, everyone is counted - an anonymous identity is still a
-    // distinct visitor, and the landing page must work before you sign in.
+    // Everyone is counted: an anonymous identity is still a distinct visitor.
     const tokenKey = `heist:landing-token:${host}:${database}`;
-    let token = "";
+    let cachedToken = "";
     try {
-      token =
-        localStorage.getItem(SPACETIME_AUTH_TOKEN_KEY) ||
-        localStorage.getItem(tokenKey) ||
-        "";
+      cachedToken = localStorage.getItem(tokenKey) ?? "";
+      // An expired token is refused with a 401, so drop it before it is used
+      // rather than after - the same guard the game transport applies.
+      if (cachedToken && tokenIsExpired(cachedToken)) {
+        localStorage.removeItem(tokenKey);
+        cachedToken = "";
+      }
     } catch {
       // A private window still connects, it just gets a new identity each time.
     }
@@ -50,34 +52,51 @@ export default function LandingCounter() {
       setLanded(total);
     };
 
-    try {
-      conn = DbConnection.builder()
-        .withUri(host)
-        .withDatabaseName(database)
-        .withToken(token)
-        .onConnect((connection, _identity, nextToken) => {
-          try {
-            localStorage.setItem(tokenKey, nextToken);
-          } catch {
-            /* nothing to persist in a private window */
-          }
-          // idempotent server-side: one row per identity, re-visits are no-ops
-          void connection.reducers.registerLanding({});
-        })
-        .onConnectError(() => {
-          /* leave the seeded figure showing */
-        })
-        .build();
+    const connect = (token: string, mayRetryAnonymously: boolean) => {
+      if (!live) return;
+      try {
+        const connection = DbConnection.builder()
+          .withUri(host)
+          .withDatabaseName(database)
+          .withToken(token)
+          .onConnect((connected, _identity, nextToken) => {
+            try {
+              localStorage.setItem(tokenKey, nextToken);
+            } catch {
+              /* nothing to persist in a private window */
+            }
+            // idempotent server-side: one row per identity, re-visits are no-ops
+            void connected.reducers.registerLanding({});
+          })
+          .onConnectError(() => {
+            // A stored token the module no longer accepts - issued against a
+            // different database, or since discarded - is refused without ever
+            // being expired, so the guard above cannot catch it. Forget it and
+            // come back with a fresh identity; otherwise the seeded figure
+            // stays frozen for as long as that token sits in storage.
+            if (!mayRetryAnonymously) return;
+            try {
+              localStorage.removeItem(tokenKey);
+            } catch {
+              /* nothing to clear in a private window */
+            }
+            connect("", false);
+          })
+          .build();
 
-      conn.db.landingVisit.onInsert(() => conn && recount(conn.db));
-      conn.db.landingVisit.onDelete(() => conn && recount(conn.db));
-      conn
-        .subscriptionBuilder()
-        .onApplied((ctx) => recount(ctx.db))
-        .subscribe(["SELECT * FROM landing_visit"]);
-    } catch {
-      /* the seeded figure is the fallback */
-    }
+        conn = connection;
+        connection.db.landingVisit.onInsert(() => recount(connection.db));
+        connection.db.landingVisit.onDelete(() => recount(connection.db));
+        connection
+          .subscriptionBuilder()
+          .onApplied((ctx) => recount(ctx.db))
+          .subscribe(["SELECT * FROM landing_visit"]);
+      } catch {
+        /* the seeded figure is the fallback */
+      }
+    };
+
+    connect(cachedToken, Boolean(cachedToken));
 
     return () => {
       live = false;

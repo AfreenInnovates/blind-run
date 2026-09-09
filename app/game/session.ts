@@ -27,7 +27,6 @@ export type SessionStatus =
   | "notfound"
   | "full"
   | "unavailable"
-  | "auth"
   | "timeout"
   | "connection";
 
@@ -161,16 +160,7 @@ export const useSession = create<SessionState>()((set, get) => ({
           unsubscribe = null;
           // Surface the actual module refusal so users know what went wrong.
           let errorStatus: SessionStatus = "notfound";
-          if (
-            refusal.includes("sign in") ||
-            refusal.includes("profile") ||
-            refusal.includes("unauthorized") ||
-            refusal.includes("invalid token") ||
-            refusal.includes("jwt") ||
-            refusal.includes("401")
-          ) {
-            errorStatus = "auth";
-          } else if (refusal.includes("taken")) {
+          if (refusal.includes("taken")) {
             errorStatus = "unavailable";
           } else if (refusal.includes("timed out") || refusal.includes("timeout")) {
             errorStatus = "timeout";
@@ -190,16 +180,9 @@ export const useSession = create<SessionState>()((set, get) => ({
       const message = error instanceof Error ? error.message.toLowerCase() : "";
       set({
         status:
-          message.includes("sign in") ||
-          message.includes("profile") ||
-          message.includes("unauthorized") ||
-          message.includes("invalid token") ||
-          message.includes("jwt") ||
-          message.includes("401")
-            ? "auth"
-            : message.includes("timed out") || message.includes("timeout")
-              ? "timeout"
-              : "connection",
+          message.includes("timed out") || message.includes("timeout")
+            ? "timeout"
+            : "connection",
         net: null,
       });
       return;
@@ -216,13 +199,11 @@ export const useSession = create<SessionState>()((set, get) => ({
             ? "full"
             : result.error === "unavailable"
               ? "unavailable"
-              : result.error === "auth"
-                ? "auth"
-                : result.error === "timeout"
-                  ? "timeout"
-                  : result.error === "connection"
-                    ? "connection"
-                    : "notfound",
+              : result.error === "timeout"
+                ? "timeout"
+                : result.error === "connection"
+                  ? "connection"
+                  : "notfound",
         net: null,
       });
       return;
